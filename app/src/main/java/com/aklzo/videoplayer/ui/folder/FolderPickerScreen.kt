@@ -63,7 +63,7 @@ fun FolderPickerScreen(
                 enabled = !state.isLoading && state.error == null,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             ) {
-                Text("このフォルダを選択")
+                Text("このフォルダを追加")
             }
         },
     ) { padding ->

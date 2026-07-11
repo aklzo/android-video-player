@@ -33,6 +33,7 @@ fun VideoListScreen(
     viewModel: VideoListViewModel,
     cachedVideoIds: Set<String>,
     onVideoClick: (VideoItem) -> Unit,
+    onVideoLongClick: (VideoItem) -> Unit,
     onSettingsClick: () -> Unit,
     onChangeFolder: () -> Unit,
     onNeedsSignIn: () -> Unit,
@@ -77,6 +78,7 @@ fun VideoListScreen(
                     cachedVideoIds = cachedVideoIds,
                     thumbnailProvider = { viewModel.loadThumbnail(it) },
                     onVideoClick = onVideoClick,
+                    onVideoLongClick = onVideoLongClick,
                 )
             }
         }

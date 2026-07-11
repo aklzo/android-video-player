@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aklzo.videoplayer.auth.NeedsSignInException
 import com.aklzo.videoplayer.data.settings.SettingsRepository
+import com.aklzo.videoplayer.data.source.VideoFolder
 import com.aklzo.videoplayer.data.source.drive.DriveApiClient
 import com.aklzo.videoplayer.data.source.drive.DriveFile
 import kotlinx.coroutines.CancellationException
@@ -73,11 +74,11 @@ class FolderPickerViewModel(
         }
     }
 
-    /** 現在のフォルダを対象フォルダとして保存する */
+    /** 現在のフォルダを対象フォルダに追加する(既存の選択は維持) */
     fun selectCurrent(onDone: () -> Unit) {
         val current = _uiState.value.current
         viewModelScope.launch {
-            settings.setFolder(current.id, current.name)
+            settings.addFolder(VideoFolder(current.id, current.name))
             onDone()
         }
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,17 +69,32 @@ fun SettingsScreen(
                 .padding(16.dp),
         ) {
             SectionTitle("対象フォルダ")
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            if (current.folders.isEmpty()) {
                 Text(
-                    current.folderName ?: "未選択",
-                    modifier = Modifier.weight(1f),
+                    "未選択",
                     style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(onClick = onChangeFolder) { Text("変更") }
             }
+            current.folders.forEach { folder ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        folder.name,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    IconButton(onClick = { viewModel.removeFolder(folder.id) }) {
+                        Icon(Icons.Default.Delete, contentDescription = "${folder.name} を削除")
+                    }
+                }
+            }
+            OutlinedButton(
+                onClick = onChangeFolder,
+                modifier = Modifier.padding(top = 4.dp),
+            ) { Text("フォルダを追加") }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
 

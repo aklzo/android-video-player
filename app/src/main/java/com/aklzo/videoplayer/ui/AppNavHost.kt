@@ -16,6 +16,8 @@ import com.aklzo.videoplayer.data.source.VideoItem
 import com.aklzo.videoplayer.ui.folder.FolderPickerScreen
 import com.aklzo.videoplayer.ui.folder.FolderPickerViewModel
 import com.aklzo.videoplayer.ui.home.HomeScreen
+import com.aklzo.videoplayer.ui.playlist.PlaylistDetailScreen
+import com.aklzo.videoplayer.ui.playlist.PlaylistDetailViewModel
 import com.aklzo.videoplayer.ui.player.PlayerScreen
 import com.aklzo.videoplayer.ui.player.PlayerViewModel
 import android.net.Uri
@@ -27,6 +29,9 @@ object Routes {
     const val VIDEO_LIST = "videoList"
     const val SETTINGS = "settings"
     const val PLAYER = "player/{fileId}/{name}?size={size}&path={path}"
+    const val PLAYLIST_DETAIL = "playlist/{playlistId}"
+
+    fun playlistDetail(playlistId: Long) = "playlist/$playlistId"
 
     fun player(item: VideoItem): String {
         // Uri.encode は空白を %20 にする(URLEncoder の "+" は Navigation で復元されない)
@@ -52,7 +57,7 @@ fun AppNavHost(
     }
     // 初回コンポジション時のフォルダ設定有無で開始画面を決める(以後は Nav 側で遷移)
     val startDestination = remember {
-        if (current.folderId == null) Routes.FOLDER_PICKER else Routes.VIDEO_LIST
+        if (current.folders.isEmpty()) Routes.FOLDER_PICKER else Routes.VIDEO_LIST
     }
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -77,9 +82,31 @@ fun AppNavHost(
             HomeScreen(
                 container = container,
                 onVideoClick = { item -> navController.navigate(Routes.player(item)) },
+                onOpenPlaylist = { id -> navController.navigate(Routes.playlistDetail(id)) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onChangeFolder = { navController.navigate(Routes.FOLDER_PICKER) },
                 onNeedsSignIn = onNeedsSignIn,
+            )
+        }
+        composable(
+            route = Routes.PLAYLIST_DETAIL,
+            arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val playlistId = backStackEntry.arguments!!.getLong("playlistId")
+            val viewModel: PlaylistDetailViewModel = viewModel(
+                factory = PlaylistDetailViewModel.Factory(
+                    container.playlistDao,
+                    playlistId,
+                    container.thumbsDir,
+                )
+            )
+            val cachedIds by container.videoCacheRepository.cachedIds
+                .collectAsStateWithLifecycle(initialValue = emptySet())
+            PlaylistDetailScreen(
+                viewModel = viewModel,
+                cachedVideoIds = cachedIds,
+                onVideoClick = { item -> navController.navigate(Routes.player(item)) },
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.SETTINGS) {

@@ -18,6 +18,10 @@ class SettingsViewModel(
     val settings: Flow<AppSettings> = settingsRepository.settings
     val cacheSizeBytes: Flow<Long> = cacheRepository.totalSizeBytes
 
+    fun removeFolder(folderId: String) {
+        viewModelScope.launch { settingsRepository.removeFolder(folderId) }
+    }
+
     fun setCacheLimitGb(gb: Int) {
         viewModelScope.launch {
             settingsRepository.setCacheLimitGb(gb)

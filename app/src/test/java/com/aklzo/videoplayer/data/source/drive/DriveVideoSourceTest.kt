@@ -1,5 +1,6 @@
 package com.aklzo.videoplayer.data.source.drive
 
+import com.aklzo.videoplayer.data.source.VideoFolder
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -66,7 +67,7 @@ class DriveVideoSourceTest {
         )
         val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
 
-        val videos = source.listVideos("top")
+        val videos = source.listVideos(listOf(VideoFolder("top", "トップ")))
 
         assertEquals(
             setOf("20260101_a.mp4", "20260102_b.mp4", "20260103_c.mp4"),
@@ -76,6 +77,50 @@ class DriveVideoSourceTest {
             "20260101_a.webp",
             videos.first { it.name == "20260101_a.mp4" }.thumbnailFileId,
         )
+        // フォルダパスは「対象フォルダ名/相対パス」
+        assertEquals(
+            "トップ/sub1",
+            videos.first { it.name == "20260101_a.mp4" }.folderPath,
+        )
+    }
+
+    @Test
+    fun `複数フォルダの動画がマージされ、重複は除去される`() = runTest {
+        // top1 ── inner(top2 と同じフォルダを対象に含む入れ子)
+        val api = FakeDriveApiClient(
+            allFolders = listOf(
+                folder("top1", "rootId"),
+                folder("inner", "top1"),
+                folder("top2", "rootId"),
+            ),
+            allMedia = listOf(
+                mp4("a.mp4", "top1"),
+                mp4("b.mp4", "inner"),
+                mp4("c.mp4", "top2"),
+            ),
+        )
+        val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
+
+        val videos = source.listVideos(
+            listOf(
+                VideoFolder("top1", "トップ1"),
+                VideoFolder("inner", "内側"), // top1 配下と重複する
+                VideoFolder("top2", "トップ2"),
+            )
+        )
+
+        assertEquals(listOf("a.mp4", "b.mp4", "c.mp4"), videos.map { it.name }.sorted())
+        // 重複分(b.mp4)は先に指定したフォルダのパスが使われる
+        assertEquals("トップ1/inner", videos.first { it.name == "b.mp4" }.folderPath)
+        // 対象フォルダ直下はフォルダ名のみ
+        assertEquals("トップ1", videos.first { it.name == "a.mp4" }.folderPath)
+    }
+
+    @Test
+    fun `フォルダ未選択なら空リスト`() = runTest {
+        val api = FakeDriveApiClient(emptyList(), emptyList())
+        val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
+        assertEquals(emptyList<Any>(), source.listVideos(emptyList()))
     }
 
     @Test
@@ -86,7 +131,7 @@ class DriveVideoSourceTest {
         )
         val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
 
-        val videos = source.listVideos("root")
+        val videos = source.listVideos(listOf(VideoFolder("root", "マイドライブ")))
 
         assertEquals(setOf("v.mp4", "w.mp4"), videos.map { it.name }.toSet())
     }

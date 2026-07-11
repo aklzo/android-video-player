@@ -8,8 +8,11 @@ import java.io.File
  * 一覧取得・サムネイル取得・動画取得をインターフェースとして分離している。
  */
 interface VideoSource {
-    /** フォルダ配下(サブフォルダを再帰的に含む)の動画(.mp4)一覧を取得する */
-    suspend fun listVideos(folderId: String): List<VideoItem>
+    /**
+     * 対象フォルダ群の配下(サブフォルダを再帰的に含む)の動画(.mp4)一覧を取得する。
+     * 同一ファイルが複数フォルダから到達できても重複しない。
+     */
+    suspend fun listVideos(folders: List<VideoFolder>): List<VideoItem>
 
     /**
      * サムネイルを取得してローカルにキャッシュし、その File を返す。

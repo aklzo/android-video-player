@@ -53,6 +53,8 @@ class AppContainer(context: Context) {
 
     private val cacheDatabase = CacheDatabase.create(appContext)
 
+    val playlistDao = cacheDatabase.playlistDao()
+
     /** Media3 SimpleCache(files/video_cache/)。プロセス内で唯一のインスタンス */
     private val mediaCache: SimpleCache = run {
         val dir = File(appContext.filesDir, "video_cache")

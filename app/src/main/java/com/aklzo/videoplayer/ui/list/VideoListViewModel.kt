@@ -49,11 +49,15 @@ class VideoListViewModel(
         viewModelScope.launch {
             try {
                 val current = settings.settings.first()
-                val folderId = current.folderId
-                    ?: throw IllegalStateException("フォルダが選択されていません")
-                val videos = videoSource.listVideos(folderId)
+                val folders = current.folders
+                val videos = videoSource.listVideos(folders)
+                val title = when {
+                    folders.isEmpty() -> "動画一覧"
+                    folders.size == 1 -> folders.first().name
+                    else -> "${folders.first().name} ほか${folders.size - 1}件"
+                }
                 _uiState.value = _uiState.value.copy(
-                    folderName = current.folderName ?: "",
+                    folderName = title,
                     groups = VideoListGrouper.group(videos),
                     isLoading = false,
                 )

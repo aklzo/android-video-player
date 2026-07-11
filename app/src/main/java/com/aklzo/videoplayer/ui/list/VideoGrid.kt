@@ -1,7 +1,8 @@
 package com.aklzo.videoplayer.ui.list
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,13 +40,14 @@ import com.aklzo.videoplayer.domain.VideoListGrouper
 import java.io.File
 import java.time.format.DateTimeFormatter
 
-/** 日付ヘッダー付きのサムネイルグリッド(YouTube 風)。両タブで共有する */
+/** 月ヘッダー付きのサムネイルグリッド(YouTube 風)。各タブで共有する */
 @Composable
 fun VideoGrid(
     groups: List<VideoGroup>,
     cachedVideoIds: Set<String>,
     thumbnailProvider: suspend (VideoItem) -> File?,
     onVideoClick: (VideoItem) -> Unit,
+    onVideoLongClick: ((VideoItem) -> Unit)? = null,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 160.dp),
@@ -68,20 +70,25 @@ fun VideoGrid(
                     isCached = video.id in cachedVideoIds,
                     thumbnailProvider = thumbnailProvider,
                     onClick = { onVideoClick(video) },
+                    onLongClick = onVideoLongClick?.let { handler -> { handler(video) } },
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun VideoCard(
+fun VideoCard(
     video: VideoItem,
     isCached: Boolean,
     thumbnailProvider: suspend (VideoItem) -> File?,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
-    Column(Modifier.clickable(onClick = onClick)) {
+    Column(
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
         val thumbnailFile by produceState<File?>(initialValue = null, video.id) {
             value = thumbnailProvider(video)
         }

@@ -26,6 +26,7 @@ import com.aklzo.videoplayer.ui.list.VideoGrid
 fun SavedVideosScreen(
     viewModel: SavedVideosViewModel,
     onVideoClick: (VideoItem) -> Unit,
+    onVideoLongClick: (VideoItem) -> Unit,
     onSettingsClick: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -56,6 +57,7 @@ fun SavedVideosScreen(
                     cachedVideoIds = emptySet(),
                     thumbnailProvider = { viewModel.localThumbnail(it) },
                     onVideoClick = onVideoClick,
+                    onVideoLongClick = onVideoLongClick,
                 )
             }
         }
