@@ -3,14 +3,19 @@ package com.aklzo.videoplayer.ui.list
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -60,27 +65,68 @@ fun VideoListScreen(
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> ErrorContent(
-                    message = state.error!!,
-                    onRetry = { viewModel.refresh() },
-                    modifier = Modifier.align(Alignment.Center),
-                )
-                state.groups.isEmpty() -> EmptyContent(
-                    onRetry = { viewModel.refresh() },
-                    onChangeFolder = onChangeFolder,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-                else -> VideoGrid(
-                    groups = state.groups,
-                    cachedVideoIds = cachedVideoIds,
-                    thumbnailProvider = { viewModel.loadThumbnail(it) },
-                    onVideoClick = onVideoClick,
-                    onVideoLongClick = onVideoLongClick,
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // ディレクトリフィルター(shorts / streams / videos 等)。分類が複数あるときのみ表示
+            if (!state.isLoading && state.error == null && state.categories.size > 1) {
+                CategoryFilterRow(
+                    categories = state.categories,
+                    selected = state.selectedCategory,
+                    onSelect = { viewModel.selectCategory(it) },
                 )
             }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    state.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    state.error != null -> ErrorContent(
+                        message = state.error!!,
+                        onRetry = { viewModel.refresh() },
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    state.groups.isEmpty() && state.selectedCategory != null -> Text(
+                        "「${state.selectedCategory}」に動画がありません",
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    state.groups.isEmpty() -> EmptyContent(
+                        onRetry = { viewModel.refresh() },
+                        onChangeFolder = onChangeFolder,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    else -> VideoGrid(
+                        groups = state.groups,
+                        cachedVideoIds = cachedVideoIds,
+                        thumbnailProvider = { viewModel.loadThumbnail(it) },
+                        onVideoClick = onVideoClick,
+                        onVideoLongClick = onVideoLongClick,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryFilterRow(
+    categories: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item(key = "all") {
+            FilterChip(
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                label = { Text("すべて") },
+            )
+        }
+        items(categories, key = { it }) { category ->
+            FilterChip(
+                selected = selected == category,
+                onClick = { onSelect(if (selected == category) null else category) },
+                label = { Text(category) },
+            )
         }
     }
 }

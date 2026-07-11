@@ -7,6 +7,7 @@ import com.aklzo.videoplayer.auth.NeedsSignInException
 import com.aklzo.videoplayer.data.settings.SettingsRepository
 import com.aklzo.videoplayer.data.source.VideoItem
 import com.aklzo.videoplayer.data.source.VideoSource
+import com.aklzo.videoplayer.domain.VideoCategories
 import com.aklzo.videoplayer.domain.VideoGroup
 import com.aklzo.videoplayer.domain.VideoListGrouper
 import java.io.File
@@ -26,6 +27,10 @@ data class VideoListUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val needsSignIn: Boolean = false,
+    /** ディレクトリフィルターの選択肢(shorts / streams / videos 等)。2 件以上のとき表示 */
+    val categories: List<String> = emptyList(),
+    /** 選択中の分類。null は「すべて」 */
+    val selectedCategory: String? = null,
 )
 
 class VideoListViewModel(
@@ -35,6 +40,9 @@ class VideoListViewModel(
 
     private val _uiState = MutableStateFlow(VideoListUiState())
     val uiState = _uiState.asStateFlow()
+
+    /** フィルター適用前の全動画 */
+    private var allVideos: List<VideoItem> = emptyList()
 
     // サムネイル取得の重複防止(fileId → 取得ジョブ)
     private val thumbnailJobs = mutableMapOf<String, Deferred<File?>>()
@@ -56,9 +64,15 @@ class VideoListViewModel(
                     folders.size == 1 -> folders.first().name
                     else -> "${folders.first().name} ほか${folders.size - 1}件"
                 }
+                allVideos = videos
+                val categories = VideoCategories.categories(videos)
+                // 再読み込みで選択中の分類が消えていたら「すべて」に戻す
+                val selected = _uiState.value.selectedCategory?.takeIf { it in categories }
                 _uiState.value = _uiState.value.copy(
                     folderName = title,
-                    groups = VideoListGrouper.group(videos),
+                    groups = VideoListGrouper.group(VideoCategories.filter(videos, selected)),
+                    categories = categories,
+                    selectedCategory = selected,
                     isLoading = false,
                 )
             } catch (e: CancellationException) {
@@ -72,6 +86,14 @@ class VideoListViewModel(
                 )
             }
         }
+    }
+
+    /** ディレクトリフィルターの切り替え。null は「すべて」 */
+    fun selectCategory(category: String?) {
+        _uiState.value = _uiState.value.copy(
+            selectedCategory = category,
+            groups = VideoListGrouper.group(VideoCategories.filter(allVideos, category)),
+        )
     }
 
     /** サムネイルのローカルファイルを取得(なければダウンロード)。UI から都度呼ばれる */
