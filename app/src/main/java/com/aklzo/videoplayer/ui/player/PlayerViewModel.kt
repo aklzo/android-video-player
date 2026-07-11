@@ -85,6 +85,13 @@ class PlayerViewModel(
         cacheRepository.markPlayed(item.id)
         PlaybackTracker.currentFileId = item.id
         _uiState.value = PlayerUiState.Ready(file)
+        // ダウンロードで上限を超えていたら古いものから削除する
+        val current = settings.current()
+        cacheRepository.evict(
+            limitBytes = current.cacheLimitBytes,
+            retentionDays = current.retentionDays,
+            playingFileId = item.id,
+        )
     }
 
     fun cancelDownload() {

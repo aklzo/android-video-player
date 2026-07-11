@@ -19,6 +19,8 @@ import com.aklzo.videoplayer.ui.list.VideoListScreen
 import com.aklzo.videoplayer.ui.list.VideoListViewModel
 import com.aklzo.videoplayer.ui.player.PlayerScreen
 import com.aklzo.videoplayer.ui.player.PlayerViewModel
+import com.aklzo.videoplayer.ui.settings.SettingsScreen
+import com.aklzo.videoplayer.ui.settings.SettingsViewModel
 import java.net.URLEncoder
 
 object Routes {
@@ -83,8 +85,21 @@ fun AppNavHost(
                 viewModel = viewModel,
                 cachedVideoIds = cachedIds,
                 onVideoClick = { item -> navController.navigate(Routes.player(item)) },
-                onSettingsClick = { /* 設定画面は後のステップで実装 */ },
+                onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onNeedsSignIn = onNeedsSignIn,
+            )
+        }
+        composable(Routes.SETTINGS) {
+            val viewModel: SettingsViewModel = viewModel(
+                factory = SettingsViewModel.Factory(
+                    container.settingsRepository,
+                    container.videoCacheRepository,
+                )
+            )
+            SettingsScreen(
+                viewModel = viewModel,
+                onChangeFolder = { navController.navigate(Routes.FOLDER_PICKER) },
+                onBack = { navController.popBackStack() },
             )
         }
         composable(

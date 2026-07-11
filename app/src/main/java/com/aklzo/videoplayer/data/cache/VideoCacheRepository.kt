@@ -2,6 +2,8 @@ package com.aklzo.videoplayer.data.cache
 
 import com.aklzo.videoplayer.data.source.VideoItem
 import com.aklzo.videoplayer.data.source.VideoSource
+import com.aklzo.videoplayer.domain.CacheEntry
+import com.aklzo.videoplayer.domain.CacheEvictionPolicy
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -91,4 +93,21 @@ class VideoCacheRepository(
     }
 
     suspend fun entries(): List<CachedVideoEntity> = dao.getAll()
+
+    /**
+     * 保持期間切れ+容量超過分を削除する(→ CacheEvictionPolicy)。
+     * アプリ起動時・ダウンロード完了後・設定変更後に呼ぶ。
+     */
+    suspend fun evict(limitBytes: Long, retentionDays: Int?, playingFileId: String?) {
+        val toDelete = CacheEvictionPolicy.selectForEviction(
+            entries = dao.getAll().map {
+                CacheEntry(fileId = it.fileId, sizeBytes = it.sizeBytes, lastPlayedAt = it.lastPlayedAt)
+            },
+            limitBytes = limitBytes,
+            retentionDays = retentionDays,
+            nowMillis = System.currentTimeMillis(),
+            playingFileId = playingFileId,
+        )
+        toDelete.forEach { delete(it) }
+    }
 }
