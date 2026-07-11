@@ -39,17 +39,18 @@
 
 <section>
   <h2>1. アプリの全体像</h2>
-  <p>選択した Google Drive フォルダ内の <code>.mp4</code> を日付ごとの一覧で表示し、
-  タップするとアプリ専用ストレージにダウンロードしてから再生するアプリです。
-  ダウンロード済みの動画はオフラインでも即座に再生でき、キャッシュは LRU
-  (最終再生日時が古い順)で自動削除されます。バックグラウンド再生に対応し、
-  通知・ロック画面から操作できます。</p>
+  <p>選択した Google Drive フォルダ<b>配下(サブフォルダを再帰的に含む)</b>の
+  <code>.mp4</code> を、日付ごとのサムネイルグリッド(YouTube 風)で表示し、
+  タップすると即座にストリーミング再生を開始するアプリです。再生と並行して動画全体を
+  バックグラウンドでアプリ専用ストレージに保存するため、保存済みの動画は
+  オフラインでも再生できます。キャッシュは LRU(最終再生日時が古い順)で自動削除されます。
+  バックグラウンド再生に対応し、通知・ロック画面から操作できます。</p>
   <table>
     <tr><th>画面</th><th>役割</th></tr>
     <tr><td>サインイン</td><td>Google アカウントで drive.readonly の許可を取得(初回のみ。以降はサイレント)</td></tr>
     <tr><td>フォルダ選択</td><td>マイドライブをブラウズして動画フォルダを選択。選択は永続化</td></tr>
-    <tr><td>動画一覧</td><td>日付グルーピング+サムネイル+キャッシュ済みマーク。エラー時は再試行導線</td></tr>
-    <tr><td>再生</td><td>ダウンロード進捗 → 全画面プレイヤー(再生/一時停止/シーク)</td></tr>
+    <tr><td>動画一覧</td><td>日付グルーピングのサムネイルグリッド+保存済みマーク。エラー・0件時は再試行/フォルダ変更導線</td></tr>
+    <tr><td>再生</td><td>即ストリーミング再生+保存進捗表示。全画面プレイヤー(再生/一時停止/シーク)</td></tr>
     <tr><td>設定</td><td>フォルダ変更・容量上限・保持期間・モバイル回線許可・使用量表示・全削除</td></tr>
   </table>
 </section>
@@ -93,20 +94,30 @@ playback/  MediaSessionService(バックグラウンド再生)</code></pre>
 
 <section>
   <h2>4. 一覧表示とサムネイル</h2>
+  <h3>サブフォルダの再帰列挙</h3>
+  <p>動画と <code>.webp</code> は動画ごとのサブディレクトリにまとまって保存されている想定です。
+  Drive API には「フォルダ配下すべて」をサーバー側で絞る手段がないため、
+  <b>全フォルダ一覧と全動画/webp 一覧を一括取得し、クライアント側で親子関係を辿って</b>
+  選択フォルダ配下だけに絞ります(<code>DriveFolderTree</code>)。
+  サブフォルダが 1,000 個以上あってもページング込み数リクエストで済みます。</p>
+  <h3>日付グルーピング</h3>
   <p>ファイル名は <code>20260315_タイトル.mp4</code> のように先頭 8 桁が日付です。
   正規表現 <code>^(\d{8})_</code> で抜き出し、<code>ResolverStyle.STRICT</code> で
   厳密にパースするため「13月」「2月30日」などは弾かれて「日付不明」グループ(末尾)に入ります。
   グループは日付降順、グループ内はファイル名昇順です。</p>
-  <p>サムネイルは同フォルダの同名 <code>.webp</code> を優先し、なければ Drive が生成する
+  <h3>サムネイル</h3>
+  <p>サムネイルは<b>同じディレクトリ</b>の同名 <code>.webp</code> を優先し、なければ Drive が生成する
   <code>thumbnailLink</code> を使います。どちらも取得後は <code>cacheDir/thumbs/</code> に
   保存され、2 回目以降は通信しません。</p>
 </section>
 
 <section>
-  <h2>5. ダウンロードとキャッシュ管理</h2>
-  <p>動画は <code>files/video_cache/&lt;fileId&gt;.mp4</code> にダウンロードされます。
-  途中キャンセル・失敗時に壊れたファイルが残らないよう、いったん <code>.part</code> に書いて
-  完了後にリネームします。メタデータ(fileId・ファイル名・サイズ・最終再生日時)は
+  <h2>5. ストリーミング再生とキャッシュ管理</h2>
+  <p>タップすると Media3 の <code>CacheDataSource</code> 経由で即ストリーミング再生が始まります。
+  再生で受信したデータはそのまま <code>files/video_cache/</code>(Media3 SimpleCache)に書かれ、
+  同時に <code>CacheWriter</code> が未取得の範囲だけをバックグラウンドで追加取得して
+  全体を保存します(<b>再生と保存で二重ダウンロードにならない</b>)。
+  完全に保存されたファイルのメタデータ(fileId・ファイル名・サイズ・最終再生日時)は
   Room の <code>cached_videos</code> テーブルで管理します。</p>
   <h3>LRU 削除(CacheEvictionPolicy)</h3>
   <ol>
@@ -115,7 +126,9 @@ playback/  MediaSessionService(バックグラウンド再生)</code></pre>
     <li><b>再生中のファイルは常に除外</b>(PlaybackTracker が再生中 fileId を保持)</li>
   </ol>
   <p>この判定は純粋関数として実装され、8 ケースのユニットテストで検証済みです。
-  実行タイミングは「起動時」「ダウンロード完了後」「設定変更後」の 3 箇所です。</p>
+  実行タイミングは「起動時」「保存完了後」「設定変更後」の 3 箇所です。
+  視聴途中で離脱した部分キャッシュは、SimpleCache 側の
+  <code>LeastRecentlyUsedCacheEvictor</code>(上限=設定値)が自動管理する二段構えです。</p>
   <h3>通信量への配慮</h3>
   <p>既定では非従量制ネットワーク(Wi-Fi 等)のときだけダウンロードします。判定は
   <code>NET_CAPABILITY_NOT_METERED</code> で行うため、従量制の Wi-Fi テザリングも
@@ -158,9 +171,9 @@ playback/  MediaSessionService(バックグラウンド再生)</code></pre>
   <table>
     <tr><th>ファイル</th><th>内容</th></tr>
     <tr><td><code>auth/GoogleAuthManager.kt</code></td><td>authorize / 同意結果処理 / トークンキャッシュと失効</td></tr>
-    <tr><td><code>data/source/drive/OkHttpDriveApiClient.kt</code></td><td>files.list ページング、alt=media ストリーミング DL、401 リトライ</td></tr>
-    <tr><td><code>data/cache/VideoCacheRepository.kt</code></td><td>DL(.part→rename)、Room 登録、markPlayed、evict、全削除</td></tr>
-    <tr><td><code>domain/*.kt</code></td><td>純粋ロジック 3 種(すべてユニットテスト付き)</td></tr>
+    <tr><td><code>data/source/drive/OkHttpDriveApiClient.kt</code></td><td>files.list ページング(全フォルダ/全メディア一括)、401 リトライ</td></tr>
+    <tr><td><code>data/cache/VideoCacheRepository.kt</code></td><td>CacheWriter によるバックグラウンド保存、Room 登録、markPlayed、evict、全削除</td></tr>
+    <tr><td><code>domain/*.kt</code></td><td>純粋ロジック 4 種(すべてユニットテスト付き)</td></tr>
     <tr><td><code>playback/PlaybackService.kt</code></td><td>MediaSessionService。通知に停止ボタンを追加</td></tr>
     <tr><td><code>ui/AppNavHost.kt</code></td><td>画面遷移(フォルダ選択→一覧→再生/設定)</td></tr>
   </table>
