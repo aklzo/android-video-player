@@ -2,28 +2,32 @@ package com.aklzo.videoplayer.ui.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -34,12 +38,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.aklzo.videoplayer.data.source.VideoItem
-import com.aklzo.videoplayer.domain.VideoGroup
 import com.aklzo.videoplayer.ui.folder.ErrorContent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +53,7 @@ fun VideoListScreen(
     cachedVideoIds: Set<String>,
     onVideoClick: (VideoItem) -> Unit,
     onSettingsClick: () -> Unit,
+    onChangeFolder: () -> Unit,
     onNeedsSignIn: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,12 +86,13 @@ fun VideoListScreen(
                     onRetry = { viewModel.refresh() },
                     modifier = Modifier.align(Alignment.Center),
                 )
-                state.groups.isEmpty() -> Text(
-                    "このフォルダに動画(.mp4)がありません",
+                state.groups.isEmpty() -> EmptyContent(
+                    onRetry = { viewModel.refresh() },
+                    onChangeFolder = onChangeFolder,
                     modifier = Modifier.align(Alignment.Center),
                 )
-                else -> GroupedVideoList(
-                    groups = state.groups,
+                else -> VideoGrid(
+                    state = state,
                     cachedVideoIds = cachedVideoIds,
                     viewModel = viewModel,
                     onVideoClick = onVideoClick,
@@ -97,27 +103,50 @@ fun VideoListScreen(
 }
 
 @Composable
-private fun GroupedVideoList(
-    groups: List<VideoGroup>,
+private fun EmptyContent(
+    onRetry: () -> Unit,
+    onChangeFolder: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            "このフォルダ配下に動画(.mp4)が見つかりません",
+            textAlign = TextAlign.Center,
+        )
+        Button(onClick = onChangeFolder) { Text("フォルダを変更") }
+        OutlinedButton(onClick = onRetry) { Text("再読み込み") }
+    }
+}
+
+/** YouTube 風のサムネイルグリッド。日付ヘッダーは全幅で挟む */
+@Composable
+private fun VideoGrid(
+    state: VideoListUiState,
     cachedVideoIds: Set<String>,
     viewModel: VideoListViewModel,
     onVideoClick: (VideoItem) -> Unit,
 ) {
-    LazyColumn(Modifier.fillMaxSize()) {
-        groups.forEach { group ->
-            item(key = "header_${group.label}") {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 160.dp),
+        modifier = Modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+    ) {
+        state.groups.forEach { group ->
+            item(key = "header_${group.label}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
                     group.label,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             items(group.videos, key = { it.id }) { video ->
-                VideoRow(
+                VideoCard(
                     video = video,
                     isCached = video.id in cachedVideoIds,
                     viewModel = viewModel,
@@ -129,26 +158,21 @@ private fun GroupedVideoList(
 }
 
 @Composable
-private fun VideoRow(
+private fun VideoCard(
     video: VideoItem,
     isCached: Boolean,
     viewModel: VideoListViewModel,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Column(Modifier.clickable(onClick = onClick)) {
         val thumbnailFile by produceState<java.io.File?>(initialValue = null, video.id) {
             value = viewModel.loadThumbnail(video)
         }
         Box(
             modifier = Modifier
-                .size(width = 112.dp, height = 63.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
@@ -164,38 +188,42 @@ private fun VideoRow(
                     Icons.Default.Movie,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
+            if (isCached) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "保存済み",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(18.dp),
                 )
             }
         }
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(
-                video.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                video.sizeBytes?.let {
-                    Text(
-                        formatSize(it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (isCached) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "ダウンロード済み",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp).size(14.dp),
-                    )
-                    Text(
-                        "済",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 2.dp),
-                    )
-                }
+        Text(
+            video.name,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            video.sizeBytes?.let {
+                Text(
+                    formatSize(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (isCached) {
+                Text(
+                    " ・保存済み",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

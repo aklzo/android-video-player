@@ -51,19 +51,27 @@ DI は Hilt を使わず、Application に手書きの `AppContainer` を置く(
 
 ```kotlin
 interface VideoSource {
-    /** フォルダ内の動画一覧(サムネイル情報込み)を取得 */
+    /** フォルダ配下(サブフォルダ再帰)の動画一覧を取得 */
     suspend fun listVideos(folderId: String): List<VideoItem>
     /** サムネイル画像を取得してローカルファイルに保存し、その File を返す */
-    suspend fun fetchThumbnail(item: VideoItem): File?
-    /** 動画本体を destination にダウンロードする(進捗コールバック付き) */
-    suspend fun downloadVideo(item: VideoItem, destination: File, onProgress: (Long, Long?) -> Unit)
+    suspend fun getThumbnail(item: VideoItem): File?
+    /** 再生・キャッシュ保存に使う URI を返す(Drive は files.get?alt=media の URL) */
+    fun playbackUri(item: VideoItem): String
 }
 ```
 
-- `VideoItem` は `id / name / sizeBytes / thumbnailRef` を持つソース非依存モデル。
+- `VideoItem` は `id / name / sizeBytes / thumbnailFileId / thumbnailUrl` を持つソース非依存モデル。
 - Drive 実装 `DriveVideoSource` は `DriveApiClient`(インターフェース)に依存し、
   ユニットテストでは `DriveApiClient` をモックする。
 - フォルダブラウズ(`listFolders`)は Drive 固有機能のため `DriveApiClient` 側に置く。
+
+### 再帰列挙
+
+- 選択フォルダから BFS でサブフォルダを辿り、全 `.mp4` / `.webp` を収集する。
+- Drive API の呼び出し回数を抑えるため、`files.list` の `q` に
+  `'id1' in parents or 'id2' in parents ...` と親フォルダをまとめて指定する(1 クエリ最大 15 件)。
+- 暴走防止のため深さ上限 10・フォルダ数上限 1000。循環(ショートカット等)は訪問済み集合で防ぐ。
+- `.webp` の紐付けは「同じ親フォルダ内の同名ファイル」に限定する(別ディレクトリの同名を誤マッチさせない)。
 
 ## 画面遷移
 
@@ -140,16 +148,29 @@ API 呼び出しで 401 → トークン破棄 → authorize() 再試行
   - `google.webClientId`(任意。未設定なら空文字)
 - OAuth の Android クライアント ID はパッケージ名 + SHA-1 で解決されるためアプリ内に持たない。
 
-## キャッシュ設計
+## 再生とキャッシュ設計(ストリーミング+バックグラウンド保存)
 
-- 保存先: `context.filesDir/video_cache/<fileId>.mp4`
-  サムネイル: `context.cacheDir/thumbs/<fileId>.webp`
-- Room `cached_videos` テーブル: `fileId(PK) / fileName / sizeBytes / lastPlayedAt / downloadedAt`
-- LRU 削除判定(純粋ロジック `CacheEvictionPolicy` としてユニットテスト対象):
+タップから再生開始までを待たせないため、Media3 のキャッシュ機構を使う。
+
+```
+ExoPlayer ──► CacheDataSource ──┬─ キャッシュ命中 → SimpleCache(files/video_cache/)から読む
+                                └─ ミス → 認証付き HTTP(alt=media)から読み、読んだ分を書き込む
+バックグラウンド保存: CacheWriter が同じ SimpleCache キー(fileId)の未取得範囲だけを追加取得
+```
+
+- 再生で受信したバイト列はそのままキャッシュに書かれるため、再生と保存で二重取得しない。
+- 認証は `ResolvingDataSource` が open のたびに Authorization ヘッダを注入する。
+- 「キャッシュ済み(=全体保存完了)」の管理は従来どおり Room `cached_videos`
+  (`fileId(PK) / fileName / sizeBytes / lastPlayedAt / downloadedAt`)。
+  行が存在する = 完全にダウンロード済み。
+- サムネイル: `context.cacheDir/thumbs/<fileId>.webp`(従来どおり)
+- LRU 削除判定(純粋ロジック `CacheEvictionPolicy`、ユニットテスト対象)は完全保存済み
+  ファイル(Room 行)に対して適用:
   1. 起動時: `lastPlayedAt` が保持期間より古いものを削除
   2. 合計サイズ > 上限: `lastPlayedAt` 昇順に、上限を下回るまで削除
   3. 再生中の fileId は常に除外
-- ダウンロードは `<fileId>.mp4.part` に書き、完了後 rename(部分ファイルをキャッシュ扱いしない)。
+- 部分キャッシュ(視聴途中で離脱した残骸)は SimpleCache の
+  `LeastRecentlyUsedCacheEvictor`(上限=設定値)が自動管理する二段構え。
 
 ## ダウンロードのネットワーク制約
 

@@ -40,15 +40,24 @@ class OkHttpDriveApiClient(
         val mimeType: String,
         val size: String? = null,
         val thumbnailLink: String? = null,
+        val parents: List<String> = emptyList(),
     ) {
-        fun toModel() = DriveFile(id, name, mimeType, size?.toLongOrNull(), thumbnailLink)
+        fun toModel() = DriveFile(id, name, mimeType, size?.toLongOrNull(), thumbnailLink, parents)
     }
 
-    override suspend fun listFolders(folderId: String): List<DriveFile> =
-        listAll("'${escapeQuery(folderId)}' in parents and mimeType = '${DriveFile.MIME_FOLDER}' and trashed = false")
+    override suspend fun listFolders(folderIds: List<String>): List<DriveFile> =
+        listInParents(folderIds, "mimeType = '${DriveFile.MIME_FOLDER}'")
 
-    override suspend fun listFiles(folderId: String): List<DriveFile> =
-        listAll("'${escapeQuery(folderId)}' in parents and mimeType != '${DriveFile.MIME_FOLDER}' and trashed = false")
+    override suspend fun listFiles(folderIds: List<String>): List<DriveFile> =
+        listInParents(folderIds, "mimeType != '${DriveFile.MIME_FOLDER}'")
+
+    /** 親フォルダを最大 [PARENTS_PER_QUERY] 件ずつ OR でまとめて files.list する */
+    private suspend fun listInParents(folderIds: List<String>, mimeCondition: String): List<DriveFile> =
+        folderIds.chunked(PARENTS_PER_QUERY).flatMap { chunk ->
+            val parentsCondition =
+                chunk.joinToString(" or ") { "'${escapeQuery(it)}' in parents" }
+            listAll("($parentsCondition) and $mimeCondition and trashed = false")
+        }
 
     private suspend fun listAll(query: String): List<DriveFile> {
         val results = mutableListOf<DriveFile>()
@@ -56,7 +65,7 @@ class OkHttpDriveApiClient(
         do {
             val url = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
                 .addQueryParameter("q", query)
-                .addQueryParameter("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink)")
+                .addQueryParameter("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,parents)")
                 .addQueryParameter("pageSize", "1000")
                 .addQueryParameter("orderBy", "name")
                 .apply { pageToken?.let { addQueryParameter("pageToken", it) } }
@@ -163,4 +172,8 @@ class OkHttpDriveApiClient(
 
     private fun escapeQuery(value: String): String =
         value.replace("\\", "\\\\").replace("'", "\\'")
+
+    companion object {
+        private const val PARENTS_PER_QUERY = 15
+    }
 }

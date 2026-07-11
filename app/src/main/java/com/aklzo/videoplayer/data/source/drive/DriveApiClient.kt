@@ -9,6 +9,8 @@ data class DriveFile(
     val mimeType: String,
     val sizeBytes: Long?,
     val thumbnailLink: String?,
+    /** 親フォルダ ID(通常 1 件)。サムネイル紐付けの「同じディレクトリ」判定に使う */
+    val parents: List<String> = emptyList(),
 ) {
     val isFolder: Boolean get() = mimeType == MIME_FOLDER
 
@@ -22,15 +24,17 @@ data class DriveFile(
  * ユニットテストではこのインターフェースをモックする。
  */
 interface DriveApiClient {
-    /** 指定フォルダ直下のサブフォルダ一覧。ルートは folderId = "root" */
-    suspend fun listFolders(folderId: String): List<DriveFile>
+    /**
+     * 指定フォルダ群の直下にあるサブフォルダ一覧。ルートは "root"。
+     * 複数フォルダは 1 クエリにまとめて問い合わせる(再帰列挙の効率化)。
+     */
+    suspend fun listFolders(folderIds: List<String>): List<DriveFile>
 
-    /** 指定フォルダ直下のファイル一覧(フォルダ以外すべて。ページングは内部で処理) */
-    suspend fun listFiles(folderId: String): List<DriveFile>
+    /** 指定フォルダ群の直下にあるファイル一覧(フォルダ以外すべて。ページングは内部で処理) */
+    suspend fun listFiles(folderIds: List<String>): List<DriveFile>
 
     /**
-     * files.get?alt=media でファイルを destination にダウンロードする。
-     * onProgress は (受信済みバイト数, 総バイト数 or null) で随時呼ばれる。
+     * files.get?alt=media でファイルを destination にダウンロードする(サムネイル用)。
      * コルーチンのキャンセルで中断でき、その場合 destination は削除される。
      */
     suspend fun downloadFile(

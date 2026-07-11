@@ -58,7 +58,7 @@ class FolderPickerViewModel(
         _uiState.value = _uiState.value.copy(isLoading = true, error = null, needsSignIn = false)
         viewModelScope.launch {
             try {
-                val folders = driveApi.listFolders(_uiState.value.current.id)
+                val folders = driveApi.listFolders(listOf(_uiState.value.current.id))
                 _uiState.value = _uiState.value.copy(isLoading = false, folders = folders)
             } catch (e: CancellationException) {
                 throw e

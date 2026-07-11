@@ -86,6 +86,7 @@ fun AppNavHost(
                 cachedVideoIds = cachedIds,
                 onVideoClick = { item -> navController.navigate(Routes.player(item)) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+                onChangeFolder = { navController.navigate(Routes.FOLDER_PICKER) },
                 onNeedsSignIn = onNeedsSignIn,
             )
         }

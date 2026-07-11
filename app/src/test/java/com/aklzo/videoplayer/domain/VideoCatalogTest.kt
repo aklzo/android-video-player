@@ -12,7 +12,15 @@ class VideoCatalogTest {
         id: String = name,
         mimeType: String = "video/mp4",
         thumbnailLink: String? = null,
-    ) = DriveFile(id = id, name = name, mimeType = mimeType, sizeBytes = 100L, thumbnailLink = thumbnailLink)
+        parent: String = "dir1",
+    ) = DriveFile(
+        id = id,
+        name = name,
+        mimeType = mimeType,
+        sizeBytes = 100L,
+        thumbnailLink = thumbnailLink,
+        parents = listOf(parent),
+    )
 
     @Test
     fun `mp4 のみが動画として列挙される`() {
@@ -39,7 +47,7 @@ class VideoCatalogTest {
     }
 
     @Test
-    fun `同名 webp がサムネイルとして紐付く`() {
+    fun `同じ親フォルダの同名 webp がサムネイルとして紐付く`() {
         val items = VideoCatalog.buildVideoItems(
             listOf(
                 file("20260315_a.mp4", id = "v1", thumbnailLink = "https://example.com/t1"),
@@ -51,6 +59,31 @@ class VideoCatalogTest {
         assertEquals("t1", a.thumbnailFileId)
         val b = items.first { it.id == "v2" }
         assertNull(b.thumbnailFileId)
+    }
+
+    @Test
+    fun `別の親フォルダにある同名 webp は紐付かない`() {
+        val items = VideoCatalog.buildVideoItems(
+            listOf(
+                file("a.mp4", id = "v1", parent = "dir1"),
+                file("a.webp", id = "t1", mimeType = "image/webp", parent = "dir2"),
+            )
+        )
+        assertNull(items[0].thumbnailFileId)
+    }
+
+    @Test
+    fun `サブフォルダごとに正しく紐付く`() {
+        val items = VideoCatalog.buildVideoItems(
+            listOf(
+                file("a.mp4", id = "v1", parent = "dir1"),
+                file("a.webp", id = "t1", mimeType = "image/webp", parent = "dir1"),
+                file("a.mp4", id = "v2", parent = "dir2"),
+                file("a.webp", id = "t2", mimeType = "image/webp", parent = "dir2"),
+            )
+        )
+        assertEquals("t1", items.first { it.id == "v1" }.thumbnailFileId)
+        assertEquals("t2", items.first { it.id == "v2" }.thumbnailFileId)
     }
 
     @Test
