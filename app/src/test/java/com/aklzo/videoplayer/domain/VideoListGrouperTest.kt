@@ -2,6 +2,7 @@ package com.aklzo.videoplayer.domain
 
 import com.aklzo.videoplayer.data.source.VideoItem
 import java.time.LocalDate
+import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -54,28 +55,41 @@ class VideoListGrouperTest {
         assertNull(VideoListGrouper.parseDate("x20260315_a.mp4"))
     }
 
-    // --- group ---
+    // --- displayTitle ---
 
     @Test
-    fun `日付降順にグルーピングされる`() {
+    fun `表示タイトルは日付プレフィックスと拡張子を除く`() {
+        assertEquals("タイトル", VideoListGrouper.displayTitle("20260315_タイトル.mp4"))
+    }
+
+    @Test
+    fun `日付プレフィックスがなければ拡張子のみ除く`() {
+        assertEquals("タイトル", VideoListGrouper.displayTitle("タイトル.mp4"))
+    }
+
+    @Test
+    fun `タイトル中のドットは最後の拡張子だけ除かれる`() {
+        assertEquals("Ver2.0紹介", VideoListGrouper.displayTitle("20260315_Ver2.0紹介.mp4"))
+    }
+
+    // --- group(月ごと) ---
+
+    @Test
+    fun `月降順にグルーピングされ、グループ内は日付降順`() {
         val groups = VideoListGrouper.group(
             listOf(
                 video("20260101_a.mp4"),
                 video("20260315_b.mp4"),
-                video("20260315_a.mp4"),
+                video("20260320_a.mp4"),
                 video("20251231_c.mp4"),
             )
         )
         assertEquals(
-            listOf(
-                LocalDate.of(2026, 3, 15),
-                LocalDate.of(2026, 1, 1),
-                LocalDate.of(2025, 12, 31),
-            ),
-            groups.map { it.date },
+            listOf(YearMonth.of(2026, 3), YearMonth.of(2026, 1), YearMonth.of(2025, 12)),
+            groups.map { it.month },
         )
-        // グループ内はファイル名昇順
-        assertEquals(listOf("20260315_a.mp4", "20260315_b.mp4"), groups[0].videos.map { it.name })
+        // 同月内は日付降順(ファイル名降順)
+        assertEquals(listOf("20260320_a.mp4", "20260315_b.mp4"), groups[0].videos.map { it.name })
     }
 
     @Test
@@ -88,8 +102,8 @@ class VideoListGrouperTest {
             )
         )
         assertEquals(2, groups.size)
-        assertEquals(LocalDate.of(2026, 3, 15), groups[0].date)
-        assertNull(groups[1].date)
+        assertEquals(YearMonth.of(2026, 3), groups[0].month)
+        assertNull(groups[1].month)
         assertEquals("日付不明", groups[1].label)
         assertEquals(
             listOf("20261301_不正日付.mp4", "メモ.mp4"),
@@ -103,8 +117,8 @@ class VideoListGrouperTest {
     }
 
     @Test
-    fun `ラベルは yyyy スラッシュ MM スラッシュ dd 形式`() {
+    fun `ラベルは yyyy スラッシュ MM 形式`() {
         val groups = VideoListGrouper.group(listOf(video("20260305_a.mp4")))
-        assertEquals("2026/03/05", groups[0].label)
+        assertEquals("2026/03", groups[0].label)
     }
 }

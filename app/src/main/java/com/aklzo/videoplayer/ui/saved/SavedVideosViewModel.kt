@@ -38,6 +38,7 @@ class SavedVideosViewModel(
                     sizeBytes = it.sizeBytes.takeIf { size -> size > 0 },
                     thumbnailFileId = null,
                     thumbnailUrl = null,
+                    folderPath = it.folderPath,
                 )
             }
             SavedVideosUiState(groups = VideoListGrouper.group(items), isLoading = false)

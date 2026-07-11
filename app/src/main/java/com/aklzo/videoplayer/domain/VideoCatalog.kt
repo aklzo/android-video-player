@@ -11,7 +11,10 @@ import com.aklzo.videoplayer.data.source.drive.DriveFile
  */
 object VideoCatalog {
 
-    fun buildVideoItems(files: List<DriveFile>): List<VideoItem> {
+    fun buildVideoItems(
+        files: List<DriveFile>,
+        folderPathOf: (DriveFile) -> String? = { null },
+    ): List<VideoItem> {
         val thumbnailsByKey = files
             .filter { it.name.endsWith(".webp", ignoreCase = true) }
             .associateBy { matchKey(it) }
@@ -26,6 +29,7 @@ object VideoCatalog {
                     sizeBytes = video.sizeBytes,
                     thumbnailFileId = thumbnail?.id,
                     thumbnailUrl = video.thumbnailLink,
+                    folderPath = folderPathOf(video),
                 )
             }
     }

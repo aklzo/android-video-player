@@ -111,6 +111,7 @@ class VideoCacheRepository(
                         sizeBytes = totalBytes ?: 0L,
                         downloadedAt = now,
                         lastPlayedAt = now,
+                        folderPath = item.folderPath.orEmpty(),
                     )
                 )
                 evictWithSettings()
@@ -126,9 +127,19 @@ class VideoCacheRepository(
         jobs[item.id] = job
     }
 
-    /** 再生開始時に呼び、LRU の基準となる最終再生日時を更新する(保存済みの場合のみ) */
-    suspend fun markPlayed(fileId: String) {
-        dao.updateLastPlayed(fileId, System.currentTimeMillis())
+    /**
+     * 再生開始時に呼び、LRU の基準となる最終再生日時を更新する(保存済みの場合のみ)。
+     * あわせてファイル名・フォルダパスを最新値に補正する(過去の不整合の自己修復)。
+     */
+    suspend fun markPlayed(item: VideoItem) {
+        val existing = dao.get(item.id) ?: return
+        dao.upsert(
+            existing.copy(
+                fileName = item.name,
+                folderPath = item.folderPath ?: existing.folderPath,
+                lastPlayedAt = System.currentTimeMillis(),
+            )
+        )
     }
 
     /** 手動全削除。再生中・保存中のファイルは除外する */

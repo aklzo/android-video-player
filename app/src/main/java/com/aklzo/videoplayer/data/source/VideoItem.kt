@@ -10,4 +10,6 @@ data class VideoItem(
     val thumbnailFileId: String?,
     /** フォールバック用サムネイル URL(Drive の thumbnailLink 等) */
     val thumbnailUrl: String?,
+    /** 選択フォルダからの相対フォルダパス(直下は空文字、不明は null)。概要欄に表示する */
+    val folderPath: String? = null,
 )

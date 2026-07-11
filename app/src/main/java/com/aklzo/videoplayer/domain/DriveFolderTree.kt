@@ -31,4 +31,31 @@ object DriveFolderTree {
             false
         }
     }
+
+    /**
+     * 選択フォルダからの相対フォルダパスを解決する関数を返す。
+     * 引数はファイルの親フォルダ ID。選択フォルダ直下なら空文字、
+     * 選択フォルダ配下に到達できなければ null。
+     * 例: 選択=suzuminemo、ファイルが suzuminemo/streams/20260420_x/ 内 → "streams/20260420_x"
+     */
+    fun pathResolver(
+        folders: List<DriveFile>,
+        rootFolderId: String,
+    ): (parentFolderId: String?) -> String? {
+        val folderById = folders.associateBy { it.id }
+        return resolver@{ parentFolderId ->
+            if (parentFolderId == null) return@resolver null
+            val names = mutableListOf<String>()
+            var current: String? = parentFolderId
+            var hops = 0
+            while (current != null && hops < MAX_HOPS) {
+                if (current == rootFolderId) return@resolver names.reversed().joinToString("/")
+                val folder = folderById[current] ?: return@resolver null
+                names += folder.name
+                current = folder.parents.firstOrNull()
+                hops++
+            }
+            null
+        }
+    }
 }

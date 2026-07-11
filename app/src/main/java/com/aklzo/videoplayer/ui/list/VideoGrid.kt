@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.aklzo.videoplayer.data.source.VideoItem
 import com.aklzo.videoplayer.domain.VideoGroup
+import com.aklzo.videoplayer.domain.VideoListGrouper
 import java.io.File
+import java.time.format.DateTimeFormatter
 
 /** 日付ヘッダー付きのサムネイルグリッド(YouTube 風)。両タブで共有する */
 @Composable
@@ -119,20 +121,22 @@ private fun VideoCard(
             }
         }
         Text(
-            video.name,
+            VideoListGrouper.displayTitle(video.name),
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            video.sizeBytes?.let {
-                Text(
-                    formatSize(it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            val date = VideoListGrouper.parseDate(video.name)
+            Text(
+                listOfNotNull(
+                    date?.format(CARD_DATE_FORMAT),
+                    video.sizeBytes?.let { formatSize(it) },
+                ).joinToString("・"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (isCached) {
                 Text(
                     " ・保存済み",
@@ -143,6 +147,8 @@ private fun VideoCard(
         }
     }
 }
+
+private val CARD_DATE_FORMAT = DateTimeFormatter.ofPattern("M月d日")
 
 internal fun formatSize(bytes: Long): String = when {
     bytes >= 1_073_741_824 -> "%.1f GB".format(bytes / 1_073_741_824.0)

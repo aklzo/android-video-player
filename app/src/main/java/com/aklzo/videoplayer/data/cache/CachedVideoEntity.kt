@@ -12,4 +12,6 @@ data class CachedVideoEntity(
     val downloadedAt: Long,
     /** epoch millis。未再生ならダウンロード日時と同じ */
     val lastPlayedAt: Long,
+    /** 選択フォルダからの相対フォルダパス(概要欄表示用) */
+    val folderPath: String = "",
 )

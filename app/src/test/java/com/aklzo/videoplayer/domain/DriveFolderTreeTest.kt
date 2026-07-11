@@ -79,4 +79,33 @@ class DriveFolderTreeTest {
 
         assertTrue(result.isEmpty())
     }
+
+    // --- pathResolver ---
+
+    @Test
+    fun `選択フォルダからの相対パスを解決できる`() {
+        val folders = listOf(
+            folder("top", "root"),
+            folder("streams", "top"),
+            folder("20260420_x", "streams"),
+        )
+        val pathOf = DriveFolderTree.pathResolver(folders, "top")
+
+        assertEquals("streams/20260420_x", pathOf("20260420_x"))
+        assertEquals("streams", pathOf("streams"))
+    }
+
+    @Test
+    fun `選択フォルダ直下は空文字になる`() {
+        val pathOf = DriveFolderTree.pathResolver(emptyList(), "top")
+        assertEquals("", pathOf("top"))
+    }
+
+    @Test
+    fun `選択フォルダ配下でなければ null`() {
+        val folders = listOf(folder("other", "root"))
+        val pathOf = DriveFolderTree.pathResolver(folders, "top")
+        assertEquals(null, pathOf("other"))
+        assertEquals(null, pathOf(null))
+    }
 }

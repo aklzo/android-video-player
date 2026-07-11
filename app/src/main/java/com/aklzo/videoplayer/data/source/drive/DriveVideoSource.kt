@@ -25,7 +25,8 @@ class DriveVideoSource(
         val folders = driveApi.listAllFolders()
         val media = driveApi.listAllMediaFiles()
         val underTarget = DriveFolderTree.filterUnder(media, folders, targetId)
-        return VideoCatalog.buildVideoItems(underTarget)
+        val pathOf = DriveFolderTree.pathResolver(folders, targetId)
+        return VideoCatalog.buildVideoItems(underTarget) { pathOf(it.parents.firstOrNull()) }
     }
 
     override suspend fun getThumbnail(item: VideoItem): File? {

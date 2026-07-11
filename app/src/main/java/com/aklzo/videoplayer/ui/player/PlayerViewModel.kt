@@ -39,14 +39,19 @@ class PlayerViewModel(
     private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Preparing)
     val uiState = _uiState.asStateFlow()
 
-    val videoName: String get() = item.name
-    val fileId: String get() = item.id
+    val video: VideoItem get() = item
 
     /** この動画のバックグラウンド保存進捗(保存中でなければ null) */
     val cachingProgress: StateFlow<VideoCacheRepository.CachingProgress?> =
         cacheRepository.cachingProgress
             .map { it[item.id] }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1000), null)
+
+    /** 保存(キャッシュ)が完了しているか。概要欄の保存状態表示に使う */
+    val isSaved: StateFlow<Boolean> =
+        cacheRepository.cachedIds
+            .map { item.id in it }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(1000), false)
 
     init {
         start()
@@ -73,7 +78,7 @@ class PlayerViewModel(
                         }
                     }
                 }
-                cacheRepository.markPlayed(item.id)
+                cacheRepository.markPlayed(item)
                 PlaybackTracker.currentFileId = item.id
                 _uiState.value = PlayerUiState.Ready(videoSource.playbackUri(item))
             } catch (e: CancellationException) {

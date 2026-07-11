@@ -26,12 +26,13 @@ object Routes {
     const val FOLDER_PICKER = "folderPicker"
     const val VIDEO_LIST = "videoList"
     const val SETTINGS = "settings"
-    const val PLAYER = "player/{fileId}/{name}?size={size}"
+    const val PLAYER = "player/{fileId}/{name}?size={size}&path={path}"
 
     fun player(item: VideoItem): String {
         // Uri.encode は空白を %20 にする(URLEncoder の "+" は Navigation で復元されない)
         val encodedName = Uri.encode(item.name)
-        return "player/${item.id}/$encodedName?size=${item.sizeBytes ?: -1L}"
+        val encodedPath = Uri.encode(item.folderPath.orEmpty())
+        return "player/${item.id}/$encodedName?size=${item.sizeBytes ?: -1L}&path=$encodedPath"
     }
 }
 
@@ -103,6 +104,10 @@ fun AppNavHost(
                     type = NavType.LongType
                     defaultValue = -1L
                 },
+                navArgument("path") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
             ),
         ) { backStackEntry ->
             val args = backStackEntry.arguments!!
@@ -112,6 +117,7 @@ fun AppNavHost(
                 sizeBytes = args.getLong("size").takeIf { it >= 0 },
                 thumbnailFileId = null,
                 thumbnailUrl = null,
+                folderPath = args.getString("path").orEmpty(),
             )
             val viewModel: PlayerViewModel = viewModel(
                 factory = PlayerViewModel.Factory(
