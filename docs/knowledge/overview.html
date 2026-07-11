@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive 動画プレイヤー 実装解説</title>
+<style>
+  :root { --accent: #3949ab; --bg: #fafafa; --card: #ffffff; --border: #e0e0e0; }
+  body { font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.8;
+         margin: 0; background: var(--bg); color: #212121; }
+  header { background: var(--accent); color: white; padding: 32px 24px; }
+  header h1 { margin: 0 0 8px; font-size: 1.6rem; }
+  header p { margin: 0; opacity: .9; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 20px 24px; margin-bottom: 24px; }
+  h2 { color: var(--accent); font-size: 1.2rem; border-bottom: 2px solid var(--accent);
+       padding-bottom: 6px; margin-top: 0; }
+  h3 { font-size: 1.02rem; margin-bottom: 4px; }
+  code { background: #eeeeee; padding: 2px 6px; border-radius: 4px; font-size: .88em; }
+  pre { background: #263238; color: #eceff1; padding: 14px 16px; border-radius: 6px;
+        overflow-x: auto; font-size: .85rem; line-height: 1.5; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #f0f2ff; }
+  .flow { background: #f0f2ff; border-left: 4px solid var(--accent); padding: 12px 16px;
+          margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .note { background: #fff8e1; border-left: 4px solid #f9a825; padding: 10px 16px;
+          border-radius: 0 6px 6px 0; margin: 12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Drive 動画プレイヤー 実装解説</h1>
+  <p>Google Drive 上の動画をサムネイル付き一覧から再生する Android アプリ / Kotlin + Jetpack Compose + Media3</p>
+</header>
+<main>
+
+<section>
+  <h2>1. アプリの全体像</h2>
+  <p>選択した Google Drive フォルダ内の <code>.mp4</code> を日付ごとの一覧で表示し、
+  タップするとアプリ専用ストレージにダウンロードしてから再生するアプリです。
+  ダウンロード済みの動画はオフラインでも即座に再生でき、キャッシュは LRU
+  (最終再生日時が古い順)で自動削除されます。バックグラウンド再生に対応し、
+  通知・ロック画面から操作できます。</p>
+  <table>
+    <tr><th>画面</th><th>役割</th></tr>
+    <tr><td>サインイン</td><td>Google アカウントで drive.readonly の許可を取得(初回のみ。以降はサイレント)</td></tr>
+    <tr><td>フォルダ選択</td><td>マイドライブをブラウズして動画フォルダを選択。選択は永続化</td></tr>
+    <tr><td>動画一覧</td><td>日付グルーピング+サムネイル+キャッシュ済みマーク。エラー時は再試行導線</td></tr>
+    <tr><td>再生</td><td>ダウンロード進捗 → 全画面プレイヤー(再生/一時停止/シーク)</td></tr>
+    <tr><td>設定</td><td>フォルダ変更・容量上限・保持期間・モバイル回線許可・使用量表示・全削除</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>2. モジュール構成(レイヤー)</h2>
+  <pre><code>ui/        画面(Compose)+ ViewModel。状態は StateFlow で保持
+domain/    純粋ロジック: 日付グルーピング / サムネイル紐付け / LRU 削除判定
+data/      source(動画ソース抽象化+Drive 実装)、cache(Room+ダウンロード)、settings(DataStore)
+auth/      AuthorizationClient によるトークン管理
+playback/  MediaSessionService(バックグラウンド再生)</code></pre>
+  <h3>「動画ソース」の抽象化</h3>
+  <p>一覧取得・サムネイル取得・動画ダウンロードは <code>VideoSource</code> インターフェースに
+  分離されています。現在の実装は <code>DriveVideoSource</code> のみですが、将来ローカルフォルダや
+  他のクラウドをソースとして追加する場合も、UI・キャッシュ層は変更不要です。</p>
+  <pre><code>interface VideoSource {
+    suspend fun listVideos(folderId: String): List&lt;VideoItem&gt;
+    suspend fun getThumbnail(item: VideoItem): File?
+    suspend fun downloadVideo(item, destination, onProgress)
+}</code></pre>
+  <p>Drive API 呼び出し自体も <code>DriveApiClient</code> インターフェースで分離しており、
+  ユニットテストでモックできます。公式 Java クライアントは使わず、OkHttp で
+  <code>files.list</code> / <code>files.get?alt=media</code> を直接呼んでいます(依存が軽い)。</p>
+</section>
+
+<section>
+  <h2>3. 認証フロー</h2>
+  <div class="flow">
+    起動 → <code>AuthorizationClient.authorize()</code>(UI なし)<br>
+    ├ 許可済み → アクセストークン取得 → そのまま一覧へ(サイレント認証)<br>
+    └ 未許可 → サインイン画面 → ボタン押下 → Google の同意画面 → トークン取得
+  </div>
+  <p>AuthorizationClient は Google Cloud Console に登録した「Android 用 OAuth クライアント ID
+  (パッケージ名+SHA-1)」で自動的に解決されるため、<b>クライアント ID をアプリに埋め込む必要が
+  ありません</b>。API 呼び出しが 401 を返した場合はトークンを破棄して 1 回だけ再取得・リトライし、
+  それでも失敗すればサインイン画面に誘導します。</p>
+  <div class="note">Web アプリケーション用クライアント ID を <code>local.properties</code> の
+  <code>google.webClientId</code> に設定すると、サインイン時に Credential Manager の
+  アカウント選択シートが先に表示されます(未設定でも機能に影響なし)。</div>
+</section>
+
+<section>
+  <h2>4. 一覧表示とサムネイル</h2>
+  <p>ファイル名は <code>20260315_タイトル.mp4</code> のように先頭 8 桁が日付です。
+  正規表現 <code>^(\d{8})_</code> で抜き出し、<code>ResolverStyle.STRICT</code> で
+  厳密にパースするため「13月」「2月30日」などは弾かれて「日付不明」グループ(末尾)に入ります。
+  グループは日付降順、グループ内はファイル名昇順です。</p>
+  <p>サムネイルは同フォルダの同名 <code>.webp</code> を優先し、なければ Drive が生成する
+  <code>thumbnailLink</code> を使います。どちらも取得後は <code>cacheDir/thumbs/</code> に
+  保存され、2 回目以降は通信しません。</p>
+</section>
+
+<section>
+  <h2>5. ダウンロードとキャッシュ管理</h2>
+  <p>動画は <code>files/video_cache/&lt;fileId&gt;.mp4</code> にダウンロードされます。
+  途中キャンセル・失敗時に壊れたファイルが残らないよう、いったん <code>.part</code> に書いて
+  完了後にリネームします。メタデータ(fileId・ファイル名・サイズ・最終再生日時)は
+  Room の <code>cached_videos</code> テーブルで管理します。</p>
+  <h3>LRU 削除(CacheEvictionPolicy)</h3>
+  <ol>
+    <li><b>保持期間切れ</b>: 最終再生から設定日数(既定 30 日)を過ぎたものを起動時に削除</li>
+    <li><b>容量超過</b>: 合計が上限(既定 10GB)を超えたら、最終再生日時の古い順に上限を下回るまで削除</li>
+    <li><b>再生中のファイルは常に除外</b>(PlaybackTracker が再生中 fileId を保持)</li>
+  </ol>
+  <p>この判定は純粋関数として実装され、8 ケースのユニットテストで検証済みです。
+  実行タイミングは「起動時」「ダウンロード完了後」「設定変更後」の 3 箇所です。</p>
+  <h3>通信量への配慮</h3>
+  <p>既定では非従量制ネットワーク(Wi-Fi 等)のときだけダウンロードします。判定は
+  <code>NET_CAPABILITY_NOT_METERED</code> で行うため、従量制の Wi-Fi テザリングも
+  ブロックされます。設定で「モバイル回線でもダウンロード」を有効にできます。</p>
+</section>
+
+<section>
+  <h2>6. 再生とバックグラウンド再生</h2>
+  <p>再生は Media3 で行います。ExoPlayer は <code>PlaybackService</code>
+  (MediaSessionService)内に生成され、画面側は <code>MediaController</code> 経由で接続します。
+  この構成により:</p>
+  <ul>
+    <li>ホーム画面へ移動・画面オフでも音声再生が継続(フォアグラウンドサービス)</li>
+    <li>通知とロック画面に再生/一時停止(Media3 標準)+停止(カスタムコマンド)を表示</li>
+    <li>イヤホンを抜くと自動一時停止、オーディオフォーカスも自動処理</li>
+  </ul>
+  <p>再生画面は全画面(システムバー非表示)で、<code>PlayerView</code> の標準コントロール
+  (再生/一時停止・シークバー)を使います。再生画面から「戻る」と再生は停止します。</p>
+</section>
+
+<section>
+  <h2>7. テストとビルド</h2>
+  <table>
+    <tr><th>対象</th><th>テスト</th></tr>
+    <tr><td>VideoListGrouper</td><td>日付パース(不正日付・うるう年)、降順グルーピング、日付不明の末尾配置 … 12 件</td></tr>
+    <tr><td>VideoCatalog</td><td>.mp4 抽出、.webp 紐付け(大文字小文字)、thumbnailLink フォールバック … 5 件</td></tr>
+    <tr><td>CacheEvictionPolicy</td><td>容量超過 LRU、保持期間切れ、再生中除外、無期限 … 8 件</td></tr>
+  </table>
+  <pre><code># ユニットテスト
+./gradlew testDebugUnitTest
+# ビルド+実機インストール
+./gradlew installDebug</code></pre>
+  <p>依存関係は <code>gradle/libs.versions.toml</code>(バージョンカタログ)で一元管理しています。
+  SDK パスや任意の <code>google.webClientId</code> は <code>local.properties</code>
+  (git 管理外)に置きます。</p>
+</section>
+
+<section>
+  <h2>8. 主要ファイル一覧</h2>
+  <table>
+    <tr><th>ファイル</th><th>内容</th></tr>
+    <tr><td><code>auth/GoogleAuthManager.kt</code></td><td>authorize / 同意結果処理 / トークンキャッシュと失効</td></tr>
+    <tr><td><code>data/source/drive/OkHttpDriveApiClient.kt</code></td><td>files.list ページング、alt=media ストリーミング DL、401 リトライ</td></tr>
+    <tr><td><code>data/cache/VideoCacheRepository.kt</code></td><td>DL(.part→rename)、Room 登録、markPlayed、evict、全削除</td></tr>
+    <tr><td><code>domain/*.kt</code></td><td>純粋ロジック 3 種(すべてユニットテスト付き)</td></tr>
+    <tr><td><code>playback/PlaybackService.kt</code></td><td>MediaSessionService。通知に停止ボタンを追加</td></tr>
+    <tr><td><code>ui/AppNavHost.kt</code></td><td>画面遷移(フォルダ選択→一覧→再生/設定)</td></tr>
+  </table>
+</section>
+
+</main>
+</body>
+</html>

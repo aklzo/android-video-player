@@ -25,17 +25,21 @@ com.aklzo.videoplayer
 │   │   └── CachedVideoEntity.kt     … fileId / 最終再生日時 / サイズ / パス
 │   └── settings/
 │       └── SettingsRepository.kt    … DataStore(フォルダID、容量上限、保持期間、Wi-Fi設定)
-├── domain/
-│   └── VideoListGrouper.kt      … 日付パース(^(\d{8})_)・グルーピング・ソート(純粋ロジック)
+├── domain/                      … 純粋ロジック(すべてユニットテスト対象)
+│   ├── VideoListGrouper.kt      … 日付パース(^(\d{8})_)・グルーピング・ソート
+│   ├── VideoCatalog.kt          … .mp4 抽出と .webp サムネイルの紐付け
+│   └── CacheEvictionPolicy.kt   … 保持期間切れ+容量超過(LRU)の削除判定
 ├── playback/
 │   ├── PlaybackService.kt       … MediaSessionService(バックグラウンド再生・通知)
-│   └── PlayerConnection.kt      … UI と MediaController の接続
+│   └── PlaybackTracker.kt       … 再生中 fileId の共有(削除除外用)
+├── RootViewModel.kt             … 認証状態の管理(サイレント認証→サインイン誘導)
+├── AppContainer.kt              … 手書き DI コンテナ
 └── ui/
     ├── AppNavHost.kt            … Navigation Compose
     ├── signin/SignInScreen.kt
     ├── folder/FolderPickerScreen.kt (+ ViewModel)
     ├── list/VideoListScreen.kt      (+ ViewModel)
-    ├── player/PlayerScreen.kt       (+ ViewModel)
+    ├── player/PlayerScreen.kt       (+ ViewModel)… DL 進捗/キャンセル/MediaController 接続
     └── settings/SettingsScreen.kt   (+ ViewModel)
 ```
 
