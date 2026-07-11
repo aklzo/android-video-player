@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.aklzo.videoplayer.ui.AppNavHost
 import com.aklzo.videoplayer.ui.signin.SignInScreen
 import kotlinx.coroutines.launch
 
@@ -54,12 +55,10 @@ class MainActivity : ComponentActivity() {
                         errorMessage = s.errorMessage,
                         onSignInClick = { viewModel.onSignInClick(this) },
                     )
-                    is RootState.SignedIn -> Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("サインイン済み(フォルダ選択は次のステップで実装)")
-                    }
+                    is RootState.SignedIn -> AppNavHost(
+                        container = (application as VideoPlayerApp).container,
+                        onNeedsSignIn = { viewModel.onSessionExpired() },
+                    )
                 }
             }
         }
