@@ -59,6 +59,27 @@ class OkHttpDriveApiClient(
             listAll("($parentsCondition) and $mimeCondition and trashed = false")
         }
 
+    override suspend fun listAllFolders(): List<DriveFile> =
+        listAll("mimeType = '${DriveFile.MIME_FOLDER}' and trashed = false")
+
+    override suspend fun listAllMediaFiles(): List<DriveFile> =
+        listAll("(mimeType = 'video/mp4' or mimeType = 'image/webp') and trashed = false")
+
+    @Serializable
+    private data class FileIdResponse(val id: String)
+
+    override suspend fun resolveRootFolderId(): String {
+        val body = withAuthRetry { token ->
+            executeCall(
+                buildRequest("https://www.googleapis.com/drive/v3/files/root?fields=id", token)
+            ).use { response ->
+                checkResponse(response)
+                withContext(Dispatchers.IO) { response.body!!.string() }
+            }
+        }
+        return json.decodeFromString<FileIdResponse>(body).id
+    }
+
     private suspend fun listAll(query: String): List<DriveFile> {
         val results = mutableListOf<DriveFile>()
         var pageToken: String? = null

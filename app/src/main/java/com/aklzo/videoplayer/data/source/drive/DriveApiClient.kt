@@ -33,6 +33,15 @@ interface DriveApiClient {
     /** 指定フォルダ群の直下にあるファイル一覧(フォルダ以外すべて。ページングは内部で処理) */
     suspend fun listFiles(folderIds: List<String>): List<DriveFile>
 
+    /** ドライブ全体のフォルダ一覧(選択フォルダ配下の判定用ツリー構築に使う) */
+    suspend fun listAllFolders(): List<DriveFile>
+
+    /** ドライブ全体の動画(video/mp4)とサムネイル(image/webp)の一覧 */
+    suspend fun listAllMediaFiles(): List<DriveFile>
+
+    /** マイドライブのルートフォルダの実 ID を返す("root" エイリアスの解決) */
+    suspend fun resolveRootFolderId(): String
+
     /**
      * files.get?alt=media でファイルを destination にダウンロードする(サムネイル用)。
      * コルーチンのキャンセルで中断でき、その場合 destination は削除される。

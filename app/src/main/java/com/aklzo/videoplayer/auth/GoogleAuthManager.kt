@@ -105,6 +105,16 @@ class GoogleAuthManager(private val context: Context) : TokenProvider {
         }
     }
 
+    /**
+     * ストリーミング再生の open ごとに呼ばれる。キャッシュを使わず authorize() し直すことで
+     * 長時間再生中のトークン失効を避ける(サイレントで完結し、UI は出ない)。
+     */
+    suspend fun freshAccessToken(): String =
+        when (val outcome = authorize()) {
+            is AuthorizeOutcome.Success -> outcome.accessToken
+            else -> throw NeedsSignInException()
+        }
+
     override suspend fun getAccessToken(): String {
         cachedToken?.let { return it }
         return mutex.withLock {

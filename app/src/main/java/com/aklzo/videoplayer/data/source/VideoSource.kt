@@ -19,11 +19,4 @@ interface VideoSource {
 
     /** 再生・キャッシュ保存に使う URI を返す(Drive は files.get?alt=media の URL) */
     fun playbackUri(item: VideoItem): String
-
-    /** 旧ダウンロード方式(ストリーミング移行で廃止予定) */
-    suspend fun downloadVideo(
-        item: VideoItem,
-        destination: File,
-        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit,
-    )
 }

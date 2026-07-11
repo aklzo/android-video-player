@@ -125,6 +125,7 @@ fun AppNavHost(
             val viewModel: PlayerViewModel = viewModel(
                 factory = PlayerViewModel.Factory(
                     item = item,
+                    videoSource = container.videoSource,
                     cacheRepository = container.videoCacheRepository,
                     networkMonitor = container.networkMonitor,
                     settings = container.settingsRepository,

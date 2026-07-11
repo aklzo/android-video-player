@@ -7,23 +7,23 @@ import org.junit.Test
 
 class DriveVideoSourceTest {
 
-    /** フォルダ階層をメモリ上で模した DriveApiClient のフェイク */
+    /** ドライブ全体をメモリ上で模した DriveApiClient のフェイク */
     private class FakeDriveApiClient(
-        /** parentId -> 直下のファイル/フォルダ */
-        private val tree: Map<String, List<DriveFile>>,
+        private val allFolders: List<DriveFile>,
+        private val allMedia: List<DriveFile>,
+        private val rootId: String = "rootId",
     ) : DriveApiClient {
-        var listCallCount = 0
-            private set
+        override suspend fun listFolders(folderIds: List<String>): List<DriveFile> =
+            allFolders.filter { it.parents.firstOrNull() in folderIds }
 
-        override suspend fun listFolders(folderIds: List<String>): List<DriveFile> {
-            listCallCount++
-            return folderIds.flatMap { id -> tree[id].orEmpty().filter { it.isFolder } }
-        }
+        override suspend fun listFiles(folderIds: List<String>): List<DriveFile> =
+            allMedia.filter { it.parents.firstOrNull() in folderIds }
 
-        override suspend fun listFiles(folderIds: List<String>): List<DriveFile> {
-            listCallCount++
-            return folderIds.flatMap { id -> tree[id].orEmpty().filterNot { it.isFolder } }
-        }
+        override suspend fun listAllFolders(): List<DriveFile> = allFolders
+
+        override suspend fun listAllMediaFiles(): List<DriveFile> = allMedia
+
+        override suspend fun resolveRootFolderId(): String = rootId
 
         override suspend fun downloadFile(
             fileId: String,
@@ -45,18 +45,24 @@ class DriveVideoSourceTest {
         DriveFile(name, name, "image/webp", 1L, null, listOf(parent))
 
     @Test
-    fun `サブフォルダ配下の動画も再帰的に列挙され、同ディレクトリの webp が紐付く`() = runTest {
+    fun `サブフォルダ配下の動画も列挙され、同ディレクトリの webp が紐付く`() = runTest {
+        // top ── sub1 ── sub1-1
+        //    └ sub2
         val api = FakeDriveApiClient(
-            tree = mapOf(
-                "top" to listOf(folder("sub1", "top"), folder("sub2", "top")),
-                "sub1" to listOf(
-                    mp4("20260101_a.mp4", "sub1"),
-                    webp("20260101_a.webp", "sub1"),
-                    folder("sub1-1", "sub1"),
-                ),
-                "sub1-1" to listOf(mp4("20260102_b.mp4", "sub1-1")),
-                "sub2" to listOf(mp4("20260103_c.mp4", "sub2")),
-            )
+            allFolders = listOf(
+                folder("top", "rootId"),
+                folder("sub1", "top"),
+                folder("sub1-1", "sub1"),
+                folder("sub2", "top"),
+                folder("unrelated", "rootId"),
+            ),
+            allMedia = listOf(
+                mp4("20260101_a.mp4", "sub1"),
+                webp("20260101_a.webp", "sub1"),
+                mp4("20260102_b.mp4", "sub1-1"),
+                mp4("20260103_c.mp4", "sub2"),
+                mp4("20260104_x.mp4", "unrelated"),
+            ),
         )
         val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
 
@@ -73,17 +79,15 @@ class DriveVideoSourceTest {
     }
 
     @Test
-    fun `フォルダの循環があっても停止する`() = runTest {
+    fun `root エイリアスは実 ID に解決されて全動画が対象になる`() = runTest {
         val api = FakeDriveApiClient(
-            tree = mapOf(
-                "a" to listOf(folder("b", "a"), mp4("v1.mp4", "a")),
-                "b" to listOf(folder("a", "b")), // a → b → a の循環
-            )
+            allFolders = listOf(folder("top", "rootId")),
+            allMedia = listOf(mp4("v.mp4", "top"), mp4("w.mp4", "rootId")),
         )
         val source = DriveVideoSource(api, thumbsDir = File("/tmp/unused"))
 
-        val videos = source.listVideos("a")
+        val videos = source.listVideos("root")
 
-        assertEquals(listOf("v1.mp4"), videos.map { it.name })
+        assertEquals(setOf("v.mp4", "w.mp4"), videos.map { it.name }.toSet())
     }
 }

@@ -9,10 +9,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -42,9 +44,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
+import com.aklzo.videoplayer.data.cache.VideoCacheRepository
 import com.aklzo.videoplayer.playback.PlaybackService
 import com.google.common.util.concurrent.MoreExecutors
-import java.io.File
 
 @Composable
 fun PlayerScreen(
@@ -54,16 +56,11 @@ fun PlayerScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val s = state) {
-        is PlayerUiState.Preparing -> CenteredMessage("準備中…")
-
-        is PlayerUiState.Downloading -> DownloadingContent(
-            name = viewModel.videoName,
-            state = s,
-            onCancel = {
-                viewModel.cancelDownload()
-                onBack()
-            },
-        )
+        is PlayerUiState.Preparing -> Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) { Text("準備中…") }
 
         is PlayerUiState.Blocked -> Column(
             Modifier.fillMaxSize().padding(32.dp),
@@ -72,9 +69,9 @@ fun PlayerScreen(
         ) {
             Text(
                 if (s.offline) {
-                    "オフラインです。接続を確認してください"
+                    "オフラインです。接続を確認してください\n(保存済みの動画はオフラインでも再生できます)"
                 } else {
-                    "モバイル回線ではダウンロードしない設定です。\nWi-Fi に接続するか、設定で「モバイル回線でもダウンロード」を有効にしてください"
+                    "モバイル回線では再生(ダウンロード)しない設定です。\nWi-Fi に接続するか、設定で「モバイル回線でもダウンロード」を有効にしてください"
                 },
                 textAlign = TextAlign.Center,
             )
@@ -92,55 +89,17 @@ fun PlayerScreen(
             OutlinedButton(onClick = onBack, Modifier.padding(top = 8.dp)) { Text("戻る") }
         }
 
-        is PlayerUiState.Ready -> VideoPlayer(file = s.file, title = viewModel.videoName)
-    }
-}
-
-@Composable
-private fun CenteredMessage(text: String) {
-    Column(
-        Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) { Text(text) }
-}
-
-@Composable
-private fun DownloadingContent(
-    name: String,
-    state: PlayerUiState.Downloading,
-    onCancel: () -> Unit,
-) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(name, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        val progress = state.progress
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-            )
-            Text(
-                "${(progress * 100).toInt()}% (${formatMb(state.bytesRead)} / ${formatMb(state.totalBytes!!)})",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        } else {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 24.dp))
-            Text(
-                formatMb(state.bytesRead),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp),
+        is PlayerUiState.Ready -> {
+            val progress by viewModel.cachingProgress.collectAsStateWithLifecycle()
+            VideoPlayer(
+                uri = s.uri,
+                cacheKey = viewModel.fileId,
+                title = viewModel.videoName,
+                cachingProgress = progress,
             )
         }
-        OutlinedButton(onClick = onCancel, Modifier.padding(top = 24.dp)) { Text("キャンセル") }
     }
 }
-
-private fun formatMb(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0)
 
 /**
  * MediaController 経由で PlaybackService の ExoPlayer に接続して再生する。
@@ -149,7 +108,12 @@ private fun formatMb(bytes: Long): String = "%.1f MB".format(bytes / 1_048_576.0
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun VideoPlayer(file: File, title: String) {
+private fun VideoPlayer(
+    uri: String,
+    cacheKey: String,
+    title: String,
+    cachingProgress: VideoCacheRepository.CachingProgress?,
+) {
     val context = LocalContext.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
 
@@ -179,14 +143,15 @@ private fun VideoPlayer(file: File, title: String) {
         onDispose { insetsController?.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    DisposableEffect(file) {
+    DisposableEffect(uri) {
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
             val c = future.get()
             val mediaItem = MediaItem.Builder()
-                .setUri(Uri.fromFile(file))
-                .setMediaId(file.nameWithoutExtension)
+                .setUri(Uri.parse(uri))
+                .setMediaId(cacheKey)
+                .setCustomCacheKey(cacheKey)
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
                 .build()
             c.setMediaItem(mediaItem)
@@ -208,16 +173,43 @@ private fun VideoPlayer(file: File, title: String) {
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = true
-                setShowNextButton(false)
-                setShowPreviousButton(false)
-                keepScreenOn = true
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    useController = true
+                    setShowNextButton(false)
+                    setShowPreviousButton(false)
+                    keepScreenOn = true
+                }
+            },
+            update = { playerView -> playerView.player = controller },
+            modifier = Modifier.fillMaxSize(),
+        )
+        // バックグラウンド保存の進捗(保存完了で消える)
+        if (cachingProgress != null) {
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                val fraction = cachingProgress.fraction
+                if (fraction != null) {
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "保存中 ${(fraction * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
             }
-        },
-        update = { playerView -> playerView.player = controller },
-        modifier = Modifier.fillMaxSize(),
-    )
+        }
+    }
 }

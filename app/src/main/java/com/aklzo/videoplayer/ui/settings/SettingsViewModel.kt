@@ -43,12 +43,7 @@ class SettingsViewModel(
     }
 
     private suspend fun evictWithCurrentSettings() {
-        val current = settingsRepository.current()
-        cacheRepository.evict(
-            limitBytes = current.cacheLimitBytes,
-            retentionDays = current.retentionDays,
-            playingFileId = PlaybackTracker.currentFileId,
-        )
+        cacheRepository.evictWithSettings()
     }
 
     class Factory(
