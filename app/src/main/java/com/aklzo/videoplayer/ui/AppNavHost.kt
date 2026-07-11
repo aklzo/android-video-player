@@ -15,8 +15,7 @@ import com.aklzo.videoplayer.LoadingScreen
 import com.aklzo.videoplayer.data.source.VideoItem
 import com.aklzo.videoplayer.ui.folder.FolderPickerScreen
 import com.aklzo.videoplayer.ui.folder.FolderPickerViewModel
-import com.aklzo.videoplayer.ui.list.VideoListScreen
-import com.aklzo.videoplayer.ui.list.VideoListViewModel
+import com.aklzo.videoplayer.ui.home.HomeScreen
 import com.aklzo.videoplayer.ui.player.PlayerScreen
 import com.aklzo.videoplayer.ui.player.PlayerViewModel
 import com.aklzo.videoplayer.ui.settings.SettingsScreen
@@ -73,17 +72,8 @@ fun AppNavHost(
             )
         }
         composable(Routes.VIDEO_LIST) {
-            val viewModel: VideoListViewModel = viewModel(
-                factory = VideoListViewModel.Factory(
-                    container.videoSource,
-                    container.settingsRepository,
-                )
-            )
-            val cachedIds by container.videoCacheRepository.cachedIds
-                .collectAsStateWithLifecycle(initialValue = emptySet())
-            VideoListScreen(
-                viewModel = viewModel,
-                cachedVideoIds = cachedIds,
+            HomeScreen(
+                container = container,
                 onVideoClick = { item -> navController.navigate(Routes.player(item)) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onChangeFolder = { navController.navigate(Routes.FOLDER_PICKER) },

@@ -38,8 +38,11 @@ com.aklzo.videoplayer
     ├── AppNavHost.kt            … Navigation Compose
     ├── signin/SignInScreen.kt
     ├── folder/FolderPickerScreen.kt (+ ViewModel)
-    ├── list/VideoListScreen.kt      (+ ViewModel)
-    ├── player/PlayerScreen.kt       (+ ViewModel)… DL 進捗/キャンセル/MediaController 接続
+    ├── home/HomeScreen.kt       … 下部タブ(動画一覧/保存済み)のホスト
+    ├── list/VideoListScreen.kt      (+ ViewModel)… Drive 由来の全動画グリッド
+    ├── list/VideoGrid.kt        … 両タブで共有するグリッド表示
+    ├── saved/SavedVideosScreen.kt   (+ ViewModel)… Room 由来。オフラインでも表示可
+    ├── player/PlayerScreen.kt       (+ ViewModel)… 即時再生+保存進捗/MediaController 接続
     └── settings/SettingsScreen.kt   (+ ViewModel)
 ```
 

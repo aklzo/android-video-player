@@ -56,6 +56,9 @@ class VideoCacheRepository(
     val cachedIds: Flow<Set<String>> =
         dao.observeAll().map { list -> list.map { it.fileId }.toSet() }
 
+    /** 保存済みタブ用。オフラインでも参照できるローカルメタデータ */
+    val cachedVideos: Flow<List<CachedVideoEntity>> = dao.observeAll()
+
     /** 進行中のバックグラウンド保存の進捗(fileId → 進捗) */
     private val _cachingProgress = MutableStateFlow<Map<String, CachingProgress>>(emptyMap())
     val cachingProgress = _cachingProgress.asStateFlow()

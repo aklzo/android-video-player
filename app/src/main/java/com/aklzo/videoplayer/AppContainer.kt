@@ -43,9 +43,12 @@ class AppContainer(context: Context) {
 
     val driveApiClient: DriveApiClient = OkHttpDriveApiClient(authManager, okHttpClient)
 
+    /** サムネイルのローカルキャッシュ先(保存済みタブでも直接参照する) */
+    val thumbsDir = File(appContext.cacheDir, "thumbs")
+
     val videoSource: VideoSource = DriveVideoSource(
         driveApi = driveApiClient,
-        thumbsDir = File(appContext.cacheDir, "thumbs"),
+        thumbsDir = thumbsDir,
     )
 
     private val cacheDatabase = CacheDatabase.create(appContext)
