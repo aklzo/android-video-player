@@ -2,6 +2,9 @@ package com.aklzo.videoplayer
 
 import android.content.Context
 import com.aklzo.videoplayer.auth.GoogleAuthManager
+import com.aklzo.videoplayer.data.cache.CacheDatabase
+import com.aklzo.videoplayer.data.cache.NetworkMonitor
+import com.aklzo.videoplayer.data.cache.VideoCacheRepository
 import com.aklzo.videoplayer.data.settings.SettingsRepository
 import com.aklzo.videoplayer.data.source.VideoSource
 import com.aklzo.videoplayer.data.source.drive.DriveApiClient
@@ -30,4 +33,14 @@ class AppContainer(context: Context) {
         driveApi = driveApiClient,
         thumbsDir = File(appContext.cacheDir, "thumbs"),
     )
+
+    private val cacheDatabase = CacheDatabase.create(appContext)
+
+    val videoCacheRepository = VideoCacheRepository(
+        dao = cacheDatabase.cachedVideoDao(),
+        videoSource = videoSource,
+        cacheDir = File(appContext.filesDir, "video_cache"),
+    )
+
+    val networkMonitor = NetworkMonitor(appContext)
 }

@@ -69,9 +69,11 @@ fun AppNavHost(
                     container.settingsRepository,
                 )
             )
+            val cachedIds by container.videoCacheRepository.cachedIds
+                .collectAsStateWithLifecycle(initialValue = emptySet())
             VideoListScreen(
                 viewModel = viewModel,
-                cachedVideoIds = emptySet(), // キャッシュ実装後に接続する
+                cachedVideoIds = cachedIds,
                 onVideoClick = { /* ダウンロード+再生は次のステップで実装 */ },
                 onSettingsClick = { /* 設定画面は後のステップで実装 */ },
                 onNeedsSignIn = onNeedsSignIn,
