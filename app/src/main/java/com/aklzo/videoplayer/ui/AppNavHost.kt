@@ -18,9 +18,9 @@ import com.aklzo.videoplayer.ui.folder.FolderPickerViewModel
 import com.aklzo.videoplayer.ui.home.HomeScreen
 import com.aklzo.videoplayer.ui.player.PlayerScreen
 import com.aklzo.videoplayer.ui.player.PlayerViewModel
+import android.net.Uri
 import com.aklzo.videoplayer.ui.settings.SettingsScreen
 import com.aklzo.videoplayer.ui.settings.SettingsViewModel
-import java.net.URLEncoder
 
 object Routes {
     const val FOLDER_PICKER = "folderPicker"
@@ -29,7 +29,8 @@ object Routes {
     const val PLAYER = "player/{fileId}/{name}?size={size}"
 
     fun player(item: VideoItem): String {
-        val encodedName = URLEncoder.encode(item.name, Charsets.UTF_8.name())
+        // Uri.encode は空白を %20 にする(URLEncoder の "+" は Navigation で復元されない)
+        val encodedName = Uri.encode(item.name)
         return "player/${item.id}/$encodedName?size=${item.sizeBytes ?: -1L}"
     }
 }
