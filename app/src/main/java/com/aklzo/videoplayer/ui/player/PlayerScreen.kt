@@ -17,15 +17,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,13 +59,17 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
 import com.aklzo.videoplayer.data.cache.VideoCacheRepository
 import com.aklzo.videoplayer.data.source.VideoItem
+import com.aklzo.videoplayer.domain.VideoCategories
 import com.aklzo.videoplayer.domain.VideoListGrouper
 import com.aklzo.videoplayer.playback.PlaybackService
 import com.google.common.util.concurrent.MoreExecutors
@@ -108,28 +124,39 @@ fun PlayerScreen(
                 video = viewModel.video,
                 isSaved = isSaved,
                 cachingProgress = cachingProgress,
+                onBack = onBack,
             )
         }
     }
 }
 
 /**
- * YouTube 風レイアウト: 上部に動画プレイヤー、下部に概要欄(メタ情報)。
- * プレイヤーの全画面ボタンで全画面(概要欄・システムバー非表示)に切り替える。
+ * 横型動画: YouTube 風レイアウト(上部プレイヤー+下部概要欄。全画面ボタンあり)。
+ * 縦型動画(shorts): 画面全体に表示し、概要欄は「詳細」ボタンからボトムシートで開く。
+ * 縦型判定は shorts ディレクトリを初期値とし、実際の映像サイズで確定する。
  * この画面を離れる(dispose)と再生を停止する。ホーム画面・画面オフでは
  * dispose されないため、バックグラウンド再生は継続する。
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerWithDetails(
     uri: String,
     video: VideoItem,
     isSaved: Boolean,
     cachingProgress: VideoCacheRepository.CachingProgress?,
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var isFullscreen by rememberSaveable { mutableStateOf(false) }
+    var showDetailsSheet by rememberSaveable { mutableStateOf(false) }
+
+    // 縦型判定: shorts ディレクトリなら初期値 true、映像サイズが分かり次第確定
+    val initialVertical = remember { VideoCategories.categoryOf(video) == "shorts" }
+    var detectedVertical by remember { mutableStateOf<Boolean?>(null) }
+    val isVertical = detectedVertical ?: initialVertical
+    val immersive = isFullscreen || isVertical
 
     BackHandler(enabled = isFullscreen) { isFullscreen = false }
 
@@ -146,12 +173,12 @@ private fun PlayerWithDetails(
         }
     }
 
-    // 全画面中のみシステムバーを隠す
+    // 全画面・縦型(shorts)表示中のみシステムバーを隠す
     val view = LocalView.current
-    DisposableEffect(isFullscreen) {
+    DisposableEffect(immersive) {
         val window = (view.context as? Activity)?.window
         val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
-        if (isFullscreen) {
+        if (immersive) {
             insetsController?.apply {
                 hide(WindowInsetsCompat.Type.systemBars())
                 systemBarsBehavior =
@@ -168,6 +195,13 @@ private fun PlayerWithDetails(
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener({
             val c = future.get()
+            c.addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: VideoSize) {
+                    if (videoSize.width > 0 && videoSize.height > 0) {
+                        detectedVertical = videoSize.height > videoSize.width
+                    }
+                }
+            })
             val mediaItem = MediaItem.Builder()
                 .setUri(Uri.parse(uri))
                 .setMediaId(video.id)
@@ -199,7 +233,7 @@ private fun PlayerWithDetails(
 
     Column(Modifier.fillMaxSize()) {
         Box(
-            modifier = if (isFullscreen) {
+            modifier = if (immersive) {
                 Modifier.fillMaxSize()
             } else {
                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
@@ -216,19 +250,83 @@ private fun PlayerWithDetails(
                 },
                 update = { playerView ->
                     playerView.player = controller
-                    playerView.setFullscreenButtonClickListener { fullscreen ->
-                        isFullscreen = fullscreen
+                    if (isVertical) {
+                        // 縦型は常に全画面のため全画面ボタンは出さない
+                        playerView.setFullscreenButtonClickListener(
+                            null as PlayerView.FullscreenButtonClickListener?
+                        )
+                    } else {
+                        playerView.setFullscreenButtonClickListener { fullscreen ->
+                            isFullscreen = fullscreen
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+
+            // 一覧へ戻るボタン(常時表示)
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "一覧に戻る",
+                    tint = Color.White,
+                )
+            }
+
+            // 縦型(shorts): タイトルと「詳細」を下部にオーバーレイ
+            if (isVertical) {
+                Column(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                ) {
+                    Text(
+                        VideoListGrouper.displayTitle(video.name),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    TextButton(
+                        onClick = { showDetailsSheet = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                        Text("詳細")
+                    }
+                }
+            }
         }
-        if (!isFullscreen) {
+        if (!immersive) {
             VideoDetails(
                 video = video,
                 isSaved = isSaved,
                 cachingProgress = cachingProgress,
                 modifier = Modifier.weight(1f),
+            )
+        }
+    }
+
+    // 縦型動画の概要欄(横型と同じ形式)をボトムシートで表示
+    if (showDetailsSheet) {
+        ModalBottomSheet(onDismissRequest = { showDetailsSheet = false }) {
+            VideoDetails(
+                video = video,
+                isSaved = isSaved,
+                cachingProgress = cachingProgress,
             )
         }
     }
