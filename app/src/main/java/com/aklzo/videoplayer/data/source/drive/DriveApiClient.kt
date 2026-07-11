@@ -38,4 +38,7 @@ interface DriveApiClient {
         destination: File,
         onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit = { _, _ -> },
     )
+
+    /** 任意 URL(thumbnailLink 等)を認証付きでダウンロードする */
+    suspend fun downloadUrl(url: String, destination: File)
 }

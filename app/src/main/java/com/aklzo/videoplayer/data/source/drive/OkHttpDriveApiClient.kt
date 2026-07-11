@@ -79,7 +79,18 @@ class OkHttpDriveApiClient(
         destination: File,
         onProgress: (Long, Long?) -> Unit,
     ) {
-        val url = "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
+        downloadToFile("https://www.googleapis.com/drive/v3/files/$fileId?alt=media", destination, onProgress)
+    }
+
+    override suspend fun downloadUrl(url: String, destination: File) {
+        downloadToFile(url, destination) { _, _ -> }
+    }
+
+    private suspend fun downloadToFile(
+        url: String,
+        destination: File,
+        onProgress: (Long, Long?) -> Unit,
+    ) {
         withAuthRetry { token ->
             executeCall(buildRequest(url, token)).use { response ->
                 checkResponse(response)

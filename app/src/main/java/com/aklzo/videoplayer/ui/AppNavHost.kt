@@ -1,13 +1,8 @@
 package com.aklzo.videoplayer.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -18,6 +13,8 @@ import com.aklzo.videoplayer.AppContainer
 import com.aklzo.videoplayer.LoadingScreen
 import com.aklzo.videoplayer.ui.folder.FolderPickerScreen
 import com.aklzo.videoplayer.ui.folder.FolderPickerViewModel
+import com.aklzo.videoplayer.ui.list.VideoListScreen
+import com.aklzo.videoplayer.ui.list.VideoListViewModel
 
 object Routes {
     const val FOLDER_PICKER = "folderPicker"
@@ -66,10 +63,19 @@ fun AppNavHost(
             )
         }
         composable(Routes.VIDEO_LIST) {
-            // 次のステップで実装
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("動画一覧(次のステップで実装)\nフォルダ: ${current.folderName}")
-            }
+            val viewModel: VideoListViewModel = viewModel(
+                factory = VideoListViewModel.Factory(
+                    container.videoSource,
+                    container.settingsRepository,
+                )
+            )
+            VideoListScreen(
+                viewModel = viewModel,
+                cachedVideoIds = emptySet(), // キャッシュ実装後に接続する
+                onVideoClick = { /* ダウンロード+再生は次のステップで実装 */ },
+                onSettingsClick = { /* 設定画面は後のステップで実装 */ },
+                onNeedsSignIn = onNeedsSignIn,
+            )
         }
     }
 }
