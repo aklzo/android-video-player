@@ -1,6 +1,9 @@
 package com.aklzo.videoplayer.data.source
 
-/** ソース非依存の動画メタデータ */
+import kotlinx.serialization.Serializable
+
+/** ソース非依存の動画メタデータ。一覧のディスクキャッシュ(VideoListCache)に JSON で保存する */
+@Serializable
 data class VideoItem(
     val id: String,
     /** ファイル名(拡張子含む) 例: 20260315_タイトル.mp4 */

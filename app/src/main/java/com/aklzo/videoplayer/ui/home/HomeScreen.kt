@@ -78,6 +78,7 @@ fun HomeScreen(
                         factory = VideoListViewModel.Factory(
                             container.videoSource,
                             container.settingsRepository,
+                            container.videoListCache,
                         )
                     )
                     val cachedIds by container.videoCacheRepository.cachedIds

@@ -13,6 +13,7 @@ import com.aklzo.videoplayer.data.cache.CacheDatabase
 import com.aklzo.videoplayer.data.cache.NetworkMonitor
 import com.aklzo.videoplayer.data.cache.VideoCacheRepository
 import com.aklzo.videoplayer.data.settings.SettingsRepository
+import com.aklzo.videoplayer.data.source.VideoListCache
 import com.aklzo.videoplayer.data.source.VideoSource
 import com.aklzo.videoplayer.data.source.drive.DriveApiClient
 import com.aklzo.videoplayer.data.source.drive.DriveVideoSource
@@ -50,6 +51,9 @@ class AppContainer(context: Context) {
         driveApi = driveApiClient,
         thumbsDir = thumbsDir,
     )
+
+    /** 最後に取得した一覧(次回の一覧画面で即表示し、裏で最新に差し替える) */
+    val videoListCache = VideoListCache(File(appContext.cacheDir, "video_list.json"))
 
     private val cacheDatabase = CacheDatabase.create(appContext)
 
