@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 
-/** ダウンロード可否のネットワーク判定(→ docs/design/decisions.md「NOT_METERED で行う」) */
+/** ダウンロード可否のネットワーク判定(→ docs/md/design/decisions.md「NOT_METERED で行う」) */
 class NetworkMonitor(context: Context) {
 
     private val connectivityManager =

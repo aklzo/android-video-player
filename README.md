@@ -101,11 +101,18 @@ app/src/main/java/com/aklzo/videoplayer/
 
 ## ドキュメント(docs/)
 
-- `docs/spec/` — 機能仕様
-- `docs/design/` — 設計書(モジュール構成・認証フロー・キャッシュ設計)と
-  **技術判断の記録(decisions.md)**。実装中の判断はすべてここに理由付きで残している
-- `docs/troubleshooting/` — ハマった問題と解決方法
-- `docs/knowledge/overview.html` — 実装全体の人間向け解説
+`docs/md/` の Markdown が原本、`docs/html/` はそこから生成した閲覧用のミラー。
+人が読むときは `docs/html/index.html` をブラウザで開く。
+
+- `docs/md/spec/` — 機能仕様
+- `docs/md/design/` — 設計書(モジュール構成・認証フロー・キャッシュ設計)と
+  技術判断の記録(decisions.md)。実装中の判断はすべてここに理由付きで残している
+- `docs/md/how-to/` — 手順書(Google Cloud のリソースの確認と整理など)
+- `docs/md/troubleshooting/` — ハマった問題と解決方法
+- `docs/md/knowledge/` — 実装全体の人間向け解説
+
+Markdown を直したら `python3 scripts/build_docs.py` で HTML を再生成する
+(書き方と手順は `docs/md/index.md`)。
 
 ## 注意事項
 

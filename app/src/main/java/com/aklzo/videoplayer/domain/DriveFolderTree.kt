@@ -5,7 +5,7 @@ import com.aklzo.videoplayer.data.source.drive.DriveFile
 /**
  * ドライブ全体のフォルダ一覧から親子関係を組み立て、
  * 「選択フォルダ配下(自身の直下+子孫フォルダ内)のファイル」だけに絞る純粋ロジック。
- * フォルダ数が多くても API 呼び出し回数に影響しない(→ docs/design/decisions.md)。
+ * フォルダ数が多くても API 呼び出し回数に影響しない(→ docs/md/design/decisions.md)。
  */
 object DriveFolderTree {
 

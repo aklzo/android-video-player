@@ -11,7 +11,7 @@ import kotlinx.serialization.json.Json
 /**
  * 最後に取得した動画一覧のディスクキャッシュ(JSON 1 ファイル)。
  * 一覧画面の初回表示でこれを即表示し、裏で Drive から最新を取得して差し替える
- * (stale-while-revalidate。→ docs/design/design.md)。
+ * (stale-while-revalidate。→ docs/md/design/design.md)。
  * 対象フォルダ(ID の集合)が保存時と異なる場合は使わない。
  */
 class VideoListCache(private val file: File) {

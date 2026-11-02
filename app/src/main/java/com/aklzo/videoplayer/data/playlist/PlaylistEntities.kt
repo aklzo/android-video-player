@@ -12,7 +12,7 @@ data class PlaylistEntity(
 
 /**
  * プレイリスト内の動画。オフラインでも表示・再生開始できるよう、
- * 動画のメタデータを非正規化して保持する(→ docs/design/decisions.md)。
+ * 動画のメタデータを非正規化して保持する(→ docs/md/design/decisions.md)。
  */
 @Entity(tableName = "playlist_items", primaryKeys = ["playlistId", "fileId"])
 data class PlaylistItemEntity(

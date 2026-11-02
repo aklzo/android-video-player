@@ -27,7 +27,7 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** 手書きの DI コンテナ(→ docs/design/decisions.md) */
+/** 手書きの DI コンテナ(→ docs/md/design/decisions.md) */
 @androidx.annotation.OptIn(UnstableApi::class)
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext

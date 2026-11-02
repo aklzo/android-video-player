@@ -31,7 +31,7 @@ sealed interface AuthorizeOutcome {
  * Android 用 OAuth クライアント ID(パッケージ名 + SHA-1)で解決されるため
  * クライアント ID をコードに持たない。
  * local.properties に google.webClientId がある場合のみ、サインイン時に
- * Credential Manager でアカウント選択を先に行う(→ docs/design/decisions.md)。
+ * Credential Manager でアカウント選択を先に行う(→ docs/md/design/decisions.md)。
  */
 class GoogleAuthManager(private val context: Context) : TokenProvider {
 
