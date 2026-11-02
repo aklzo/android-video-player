@@ -22,7 +22,7 @@ summary: このアプリが Google Cloud で使うのは Drive API と OAuth の
 : アプリが使う Google Cloud の設定(README.md のセットアップ手順から)
 
 > [!NOTE]
-> 表はリポジトリのコードと README.md から読み取った内容です。2026-11-03 に gcloud で確かめたところ、アプリ用のプロジェクトは `android-video-player-502112` で、表のほかにリソースはありませんでした。Cloud Run は別のアプリのプロジェクトにあり、このアプリとは関係しません。
+> 表はリポジトリのコードと README.md から読み取った内容です。2026-11-03 に gcloud で確かめたところ、アプリ用のプロジェクト(名前は android-video-player)には、表のほかにリソースはありませんでした。Cloud Run は別のアプリのプロジェクトにあり、このアプリとは関係しません。
 
 この PC の WSL(Ubuntu 24.04)には、2026-11-03 の時点で gcloud CLI 591.0.0 が apt で入っています(`/usr/bin/gcloud`)。
 

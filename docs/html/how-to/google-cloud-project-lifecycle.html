@@ -1434,52 +1434,43 @@ h1, h2, h3, .lede { word-break: auto-phrase; }
 <body>
 <!-- このファイルは scripts/build_docs.py が docs/md/how-to/google-cloud-project-lifecycle.md から生成しています。直接編集せず、原本を直してから再生成してください。 -->
 <article class="doc">
-<header class="doc-hero"><p class="eyebrow"><a href="../index.html">ドキュメント一覧</a> · 手順書</p><h1>Google Cloud プロジェクトの削除と再作成</h1><p class="lede">アプリ用の Google Cloud プロジェクト android-video-player-502112 を削除する手順と、あとで同じ構成に作り直す手順。削除は gcloud CLI だけで完結するが、作り直しでは OAuth 同意画面と Android 用 OAuth クライアントをコンソールで作る必要がある。</p><div class="doc-meta" aria-label="文書の情報"><span><strong>状態:</strong> 現行</span><span><strong>更新日:</strong> 2026-11-03</span><span><strong>読み手:</strong> このアプリの Google Cloud プロジェクトを管理する開発者</span><span><strong>原本:</strong> <a href="../../md/how-to/google-cloud-project-lifecycle.md"><code>docs/md/how-to/google-cloud-project-lifecycle.md</code></a></span></div></header>
+<header class="doc-hero"><p class="eyebrow"><a href="../index.html">ドキュメント一覧</a> · 手順書</p><h1>Google Cloud プロジェクトの削除と再作成</h1><p class="lede">アプリ用の Google Cloud プロジェクトを削除する手順と、もう一度使うときに新しく作る手順。削除は gcloud CLI だけで完結し、作り直しでは OAuth 同意画面と Android 用 OAuth クライアントをコンソールで作る。プロジェクト ID や証明書のフィンガープリントのような環境ごとの値はこの文書に残さず、作業のときに調べる。</p><div class="doc-meta" aria-label="文書の情報"><span><strong>状態:</strong> 現行</span><span><strong>更新日:</strong> 2026-11-03</span><span><strong>読み手:</strong> このアプリの Google Cloud プロジェクトを管理する開発者</span><span><strong>原本:</strong> <a href="../../md/how-to/google-cloud-project-lifecycle.md"><code>docs/md/how-to/google-cloud-project-lifecycle.md</code></a></span></div></header>
 
 <section class="section" aria-labelledby="作業の前に"><div class="section-head"><span class="section-num">01</span><h2 id="作業の前に">作業の前に</h2></div>
 <p>削除は <code>gcloud projects delete</code> だけで完結します。作り直すときは、プロジェクトの作成と Drive API の有効化は gcloud でできますが、OAuth 同意画面と Android 用 OAuth クライアント ID は Google Cloud コンソールで作る必要があります。</p>
 <div class="table-scroll"><table><caption>表 1　gcloud CLI でできる作業</caption><thead><tr><th>作業</th><th>gcloud CLI</th><th>コンソール</th></tr></thead><tbody><tr><td>プロジェクトの削除と復元</td><td>できる</td><td>不要</td></tr><tr><td>プロジェクトの作成、課金の紐付け、API の有効化</td><td>できる</td><td>不要</td></tr><tr><td>OAuth 同意画面(アプリ名、対象、テストユーザー、スコープ)</td><td>できない</td><td>必要</td></tr><tr><td>Android 用 OAuth クライアント ID(パッケージ名と SHA-1)</td><td>できない</td><td>必要</td></tr></tbody></table></div>
 <div class="evidence"><p>gcloud 591.0.0 のヘルプで確かめました(2026-11-03)。<code>gcloud iam oauth-clients create</code> のクライアントの種類は <code>confidential-client</code> と <code>public-client</code> だけで、Android のパッケージ名や SHA-1 を指定するオプションがありません。<code>gcloud alpha iap oauth-brands</code> は IAP 用で、その API は 2026-03-19 に停止しています。</p></div>
 <p>削除すると OAuth クライアントも消えるので、アプリはサインインできなくなります。認証に失敗するとサインイン画面から先へ進まないため、保存済みの動画も開けません(<code>app/src/main/java/com/aklzo/videoplayer/RootViewModel.kt</code>)。</p>
-<p>削除したプロジェクトは 30 日間は元に戻せ、そのあと完全に削除されます。完全に削除されたあとは、プロジェクト ID <code>android-video-player-502112</code> を再び使えません。作り直すときは新しい ID でプロジェクトを作ります。アプリのコードと <code>local.properties</code> は変えなくてよく、クライアント ID はパッケージ名と SHA-1 で解決されます(<a href="../design/design.html">設計書</a>)。</p>
+<p>削除したプロジェクトは 30 日間は元に戻せ、そのあと完全に削除されます。完全に削除されたあとは同じプロジェクト ID を使えないので、もう一度使うときは新しいプロジェクトを作ります。作り直しに必要な設定はリポジトリにある値と作業のときに調べる値だけなので、削除の前に控えておくものはありません。アプリのコードと <code>local.properties</code> は変えなくてよく、クライアント ID はパッケージ名と SHA-1 で解決されます(<a href="../design/design.html">設計書</a>)。</p>
 </section>
-<section class="section" aria-labelledby="削除前の構成"><div class="section-head"><span class="section-num">02</span><h2 id="削除前の構成">削除前の構成</h2></div>
-<p>2026-11-03 に gcloud とリポジトリで確かめた構成です。作り直すときは、この表のとおりに設定します。</p>
-<div class="table-scroll"><table><caption>表 2　削除前の構成(2026-11-03 時点)</caption><thead><tr><th>項目</th><th>値</th></tr></thead><tbody><tr><td>プロジェクト ID</td><td><code>android-video-player-502112</code>(名前 android-video-player、番号 206236835316、2026-07-11 作成)</td></tr><tr><td>アプリが使う API</td><td><code>drive.googleapis.com</code>。ほかに有効な API は、新しいプロジェクトで最初から有効になっているもの</td></tr><tr><td>ほかのリソース</td><td>サービスアカウント、Cloud Storage のバケット、Cloud Run、BigQuery のデータセットはない</td></tr><tr><td>権限</td><td>owner はアプリの開発者のアカウントだけ</td></tr><tr><td>課金</td><td>請求先アカウントに紐付いている</td></tr><tr><td>OAuth 同意画面</td><td>外部向けのテストモード。スコープは <code>https://www.googleapis.com/auth/drive.readonly</code>。テストユーザーはアプリでサインインする Google アカウント</td></tr><tr><td>Android 用 OAuth クライアント</td><td>パッケージ名 <code>com.aklzo.videoplayer</code>、SHA-1 <code>80:AD:AB:FE:2E:F9:E9:3A:84:57:03:7F:9E:AA:99:DF:0B:1D:34:8A</code></td></tr><tr><td>署名に使うキーストア</td><td><code>~/.android/debug.keystore</code>(<code>app/build.gradle.kts</code> に signingConfigs はなく、デバッグ用の鍵で署名する。有効期限 2053-11-26)</td></tr><tr><td>Web 用 OAuth クライアント</td><td>使っていない(<code>local.properties</code> の <code>google.webClientId</code> はコメントアウト)</td></tr></tbody></table></div>
-</section>
-<section class="section" aria-labelledby="削除前の控え"><div class="section-head"><span class="section-num">03</span><h2 id="削除前の控え">削除前の控え</h2></div>
-<ol class="procedure-steps"><li>
-<h3 id="コンソールの設定を控える">コンソールの設定を控える</h3>
-<p>OAuth 同意画面とクライアントの設定は gcloud では読み出せません。コンソールの OAuth 同意画面(<code>https://console.cloud.google.com/apis/credentials/consent?project=android-video-player-502112</code>)を開き、アプリ名、サポートメール、テストユーザー、スコープ、Android クライアントの名前とパッケージ名と SHA-1 を確かめてください。上の表と違うところがあれば、この文書の表を直してからプロジェクトを削除します。</p>
-</li><li>
-<h3 id="デバッグ用のキーストアを保管する">デバッグ用のキーストアを保管する</h3>
-<p>SHA-1 は <code>~/.android/debug.keystore</code> から決まります。PC を替えたりファイルを消したりすると SHA-1 が変わり、作り直すときに新しい SHA-1 を登録することになります。同じ SHA-1 を使い続けたい場合は、このファイルをリポジトリの外に保管してください。</p>
-<p>いまの SHA-1 は次のコマンドで確かめられます。</p>
+<section class="section" aria-labelledby="作業で使う値の調べ方"><div class="section-head"><span class="section-num">02</span><h2 id="作業で使う値の調べ方">作業で使う値の調べ方</h2></div>
+<div class="table-scroll"><table><caption>表 2　作業で使う値</caption><thead><tr><th>値</th><th>調べ方</th></tr></thead><tbody><tr><td>プロジェクト ID</td><td><code>gcloud projects list --filter=&quot;name:android-video-player&quot; --format=&quot;value(projectId)&quot;</code></td></tr><tr><td>パッケージ名</td><td><code>com.aklzo.videoplayer</code>(<code>app/build.gradle.kts</code> の <code>applicationId</code>)</td></tr><tr><td>スコープ</td><td><code>https://www.googleapis.com/auth/drive.readonly</code>(<a href="../spec/spec.html">仕様書</a>)</td></tr><tr><td>署名の SHA-1</td><td>下のコマンド</td></tr></tbody></table></div>
 <pre><span class="lang">bash</span>keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1</pre>
-</li></ol>
+<p>アプリはデバッグ用の鍵(<code>~/.android/debug.keystore</code>)で署名しています。このファイルがない環境では、デバッグビルドのときに Android のビルドツールが新しく作ります。その場合は SHA-1 が変わるので、作り直すときは新しい SHA-1 を登録します。</p>
+<div class="evidence"><p>鍵が変わると、端末に入っているアプリへの上書きインストールは署名の違いで失敗します。いったんアンインストールすると、端末に保存した動画、プレイリスト、設定も消えます。</p></div>
 </section>
-<section class="section" aria-labelledby="プロジェクトの削除"><div class="section-head"><span class="section-num">04</span><h2 id="プロジェクトの削除">プロジェクトの削除</h2></div>
-<div class="danger"><p>削除するとアプリはすぐにサインインできなくなり、30 日が過ぎると元に戻せません。作業の前に、節「削除前の控え」を済ませてください。</p></div>
+<section class="section" aria-labelledby="プロジェクトの削除"><div class="section-head"><span class="section-num">03</span><h2 id="プロジェクトの削除">プロジェクトの削除</h2></div>
+<div class="danger"><p>削除するとアプリはすぐにサインインできなくなり、30 日が過ぎると元に戻せません。</p></div>
 <ol class="procedure-steps"><li>
 <h3 id="対象のプロジェクトを確かめる">対象のプロジェクトを確かめる</h3>
-<p>gcloud の既定のプロジェクトは別のアプリのものになっていることがあるので、ID を必ず明示します。</p>
-<pre><span class="lang">bash</span>gcloud projects describe android-video-player-502112 --format="value(name,lifecycleState)"</pre>
+<p>gcloud の既定のプロジェクトは別のアプリのものになっていることがあるので、ID を必ず明示します。<code>PROJECT_ID</code> は、節「作業で使う値の調べ方」で調べたプロジェクト ID に置き換えてください。</p>
+<pre><span class="lang">bash</span>gcloud projects describe PROJECT_ID --format="value(name,lifecycleState)"</pre>
 <div class="outcome"><p><code>android-video-player</code> と <code>ACTIVE</code> が表示されれば、対象は正しいです。</p></div>
 </li><li>
 <h3 id="プロジェクトを削除する">プロジェクトを削除する</h3>
 <p>確認を求められたら <code>y</code> と答えます。</p>
-<pre><span class="lang">bash</span>gcloud projects delete android-video-player-502112</pre>
+<pre><span class="lang">bash</span>gcloud projects delete PROJECT_ID</pre>
 <div class="outcome"><p>手順 1 のコマンドで <code>DELETE_REQUESTED</code> が表示されれば、削除の受付は完了です。30 日後に完全に削除されます。</p></div>
 </li></ol>
 </section>
-<section class="section" aria-labelledby="30-日以内の復元"><div class="section-head"><span class="section-num">05</span><h2 id="30-日以内の復元">30 日以内の復元</h2></div>
+<section class="section" aria-labelledby="30-日以内の復元"><div class="section-head"><span class="section-num">04</span><h2 id="30-日以内の復元">30 日以内の復元</h2></div>
 <p>削除を取り消すと、元のプロジェクト ID と OAuth の設定がそのまま戻ります。課金は自動では戻らないので、課金を使う場合だけ紐付け直します。すべてのサービスが使えるようになるまで、最大で 36 時間かかることがあります。</p>
-<pre><span class="lang">bash</span>gcloud projects undelete android-video-player-502112
+<pre><span class="lang">bash</span>gcloud projects undelete PROJECT_ID
 # 課金を使う場合だけ。BILLING_ACCOUNT_ID は gcloud billing accounts list で確かめる
-gcloud billing projects link android-video-player-502112 --billing-account=BILLING_ACCOUNT_ID</pre>
+gcloud billing projects link PROJECT_ID --billing-account=BILLING_ACCOUNT_ID</pre>
 </section>
-<section class="section" aria-labelledby="プロジェクトの作り直し"><div class="section-head"><span class="section-num">06</span><h2 id="プロジェクトの作り直し">プロジェクトの作り直し</h2></div>
-<p>完全に削除されたあとで、同じ構成に作り直す手順です。<code>NEW_PROJECT_ID</code> は新しいプロジェクト ID に置き換えます(元の ID は使えません)。</p>
+<section class="section" aria-labelledby="プロジェクトの新規作成"><div class="section-head"><span class="section-num">05</span><h2 id="プロジェクトの新規作成">プロジェクトの新規作成</h2></div>
+<p>もう一度使うときに、新しいプロジェクトを作る手順です。<code>NEW_PROJECT_ID</code> は新しいプロジェクト ID に置き換えます(削除したプロジェクトの ID は使えません)。</p>
 <ol class="procedure-steps"><li>
 <h3 id="プロジェクトを作る">プロジェクトを作る</h3>
 <pre><span class="lang">bash</span>gcloud projects create NEW_PROJECT_ID --name="android-video-player"</pre>
@@ -1489,11 +1480,11 @@ gcloud billing projects link android-video-player-502112 --billing-account=BILLI
 <div class="evidence"><p>推定: Drive API は課金を紐付けなくても有効にできると考えています。課金が必要というエラーが出たら、<code>gcloud billing projects link NEW_PROJECT_ID --billing-account=BILLING_ACCOUNT_ID</code> で紐付けてから、もう一度実行してください。</p></div>
 </li><li>
 <h3 id="OAuth-同意画面を作る">OAuth 同意画面を作る</h3>
-<p>コンソールの <code>https://console.cloud.google.com/apis/credentials/consent?project=NEW_PROJECT_ID</code> を開き、節「削除前の構成」の表のとおりに設定します。</p>
-<ul><li>対象は外部向けにし、公開ステータスはテストのままにする</li><li>テストユーザーに、アプリでサインインする Google アカウントを足す</li><li>スコープに <code>https://www.googleapis.com/auth/drive.readonly</code> を足す</li></ul>
+<p>コンソールの <code>https://console.cloud.google.com/apis/credentials/consent?project=NEW_PROJECT_ID</code> を開いて設定します。</p>
+<ul><li>アプリ名は自由に決め、サポートメールには自分のアカウントを選ぶ</li><li>対象は外部向けにし、公開ステータスはテストのままにする</li><li>テストユーザーに、アプリでサインインする Google アカウントを足す</li><li>スコープに <code>https://www.googleapis.com/auth/drive.readonly</code> を足す</li></ul>
 </li><li>
 <h3 id="Android-用-OAuth-クライアント-ID-を作る">Android 用 OAuth クライアント ID を作る</h3>
-<p>同じコンソールで OAuth クライアント ID を作ります。アプリケーションの種類は Android にし、パッケージ名に <code>com.aklzo.videoplayer</code>、SHA-1 にキーストアの SHA-1 を入れてください。</p>
+<p>同じコンソールで OAuth クライアント ID を作ります。アプリケーションの種類は Android にし、パッケージ名に <code>com.aklzo.videoplayer</code>、SHA-1 に節「作業で使う値の調べ方」で調べた値を入れてください。</p>
 <div class="evidence"><p>未確認: 古いプロジェクトが削除待ちの 30 日のあいだは、同じパッケージ名と SHA-1 のクライアントを新しいプロジェクトに作れない可能性があります。作れないときは、古いプロジェクトを復元して使うか、完全に削除されるまで待ってください。</p></div>
 </li><li>
 <h3 id="アプリで確かめる">アプリで確かめる</h3>
@@ -1501,8 +1492,8 @@ gcloud billing projects link android-video-player-502112 --billing-account=BILLI
 <div class="outcome"><p>アプリを起動してサインインし、フォルダを選んで動画の一覧が表示されれば、作り直しは完了です。</p></div>
 </li></ol>
 </section>
-<section class="section" aria-labelledby="完了の確認"><div class="section-head"><span class="section-num">07</span><h2 id="完了の確認">完了の確認</h2></div>
-<p>削除した場合は、<code>gcloud projects describe android-video-player-502112 --format=&quot;value(lifecycleState)&quot;</code> が <code>DELETE_REQUESTED</code> を表示すれば完了です。作り直した場合は、アプリでサインインでき、動画の一覧が表示されれば完了です。</p>
+<section class="section" aria-labelledby="完了の確認"><div class="section-head"><span class="section-num">06</span><h2 id="完了の確認">完了の確認</h2></div>
+<p>削除した場合は、<code>gcloud projects describe PROJECT_ID --format=&quot;value(lifecycleState)&quot;</code> が <code>DELETE_REQUESTED</code> を表示すれば完了です。作り直した場合は、アプリでサインインでき、動画の一覧が表示されれば完了です。</p>
 </section>
 </article>
 </body>

@@ -1436,69 +1436,74 @@ h1, h2, h3, .lede { word-break: auto-phrase; }
 <article class="doc">
 <header class="doc-hero"><p class="eyebrow"><a href="../index.html">ドキュメント一覧</a> · 技術判断の記録</p><h1>技術判断の記録</h1><p class="lede">実装中に迷った点について、どう判断したかとその理由を記録する。新しい判断を上に足す。</p><div class="doc-meta" aria-label="文書の情報"><span><strong>状態:</strong> 現行</span><span><strong>更新日:</strong> 2026-11-03</span><span><strong>原本:</strong> <a href="../../md/design/decisions.md"><code>docs/md/design/decisions.md</code></a></span></div></header>
 
-<section class="section" aria-labelledby="2026-11-03-ドキュメントを-md-の原本と-html-のミラーに分ける"><div class="section-head"><span class="section-num">01</span><h2 id="2026-11-03-ドキュメントを-md-の原本と-html-のミラーに分ける">2026-11-03: ドキュメントを md の原本と html のミラーに分ける</h2></div>
+<section class="section" aria-labelledby="2026-11-03-Google-Cloud-の環境ごとの値は-Git-に残さない"><div class="section-head"><span class="section-num">01</span><h2 id="2026-11-03-Google-Cloud-の環境ごとの値は-Git-に残さない">2026-11-03: Google Cloud の環境ごとの値は Git に残さない</h2></div>
+<div class="decision-statement"><p>プロジェクト ID、プロジェクト番号、署名証明書の SHA-1 のような環境ごとの値は、ドキュメントに書かない。手順書には調べ方のコマンドを書き、値は作業のときに調べる。Google Cloud のプロジェクトを削除したあとでもう一度使うときは、控えから戻すのではなく、新しく作る。</p></div>
+<p>利用者から、Git に詳細な情報を残したくないという希望があった。これらの値は作り直しに必要なく(パッケージ名とスコープはリポジトリにあり、SHA-1 とプロジェクト ID はその場で調べられる)、プロジェクトを作り直すたびに変わるので、書いておいても古くなる。リポジトリは公開なので、載せる情報は少ないほうがよい。</p>
+<p>トレードオフとして、以前のコミットの履歴には値が残る。どれも秘密情報ではない。また、履歴を書き換える(force push)ことはこのリポジトリの決まりで禁じているため、履歴はそのままにする。</p>
+</section>
+<section class="section" aria-labelledby="2026-11-03-ドキュメントを-md-の原本と-html-のミラーに分ける"><div class="section-head"><span class="section-num">02</span><h2 id="2026-11-03-ドキュメントを-md-の原本と-html-のミラーに分ける">2026-11-03: ドキュメントを md の原本と html のミラーに分ける</h2></div>
 <div class="decision-statement"><p>docs/ を、生成 AI が読んで編集する原本の docs/md/ と、人が確かめるための閲覧用ミラーの docs/html/ に分ける。HTML は <code>scripts/build_docs.py</code> で md から生成し、手では編集しない。見た目は document-design-system の field-notes テーマにそろえる。</p></div>
 <p>利用者から、md を生成 AI が作業するときの原本に、html を人が確認するためのミラーにするよう依頼があった。HTML を手で書くと md と食い違っていくため、md から生成し、<code>--check</code> で一致を確かめられるようにした。</p>
 <p>依存を増やさないため、Markdown の変換は標準ライブラリだけの小さな実装にし、docs/md/ で使う記法だけに対応させた。テーマは文書の種類ごとの既定(手順書なら editorial-coral)にせず、すべて field-notes にそろえた。一覧から文書を行き来するときに見た目が変わらないほうが読みやすいと考えたためである。これまでの docs/knowledge/overview.html は md の原本に書き直し、HTML は生成物に置き換えた。</p>
 <p>トレードオフとして、対応していない記法(画像、斜体、箇条書きの中のコードブロックなど)は使えない。HTML は CSS を埋め込んだ 1 ファイルで、文書ごとに数十 KB になる。フォントは Google Fonts から読み込むため、オフラインでは代わりのフォントで表示される。</p>
 </section>
-<section class="section" aria-labelledby="2026-11-03-一覧の高速化は前回の一覧をすぐ表示して裏で更新を主にする"><div class="section-head"><span class="section-num">02</span><h2 id="2026-11-03-一覧の高速化は前回の一覧をすぐ表示して裏で更新を主にする">2026-11-03: 一覧の高速化は「前回の一覧をすぐ表示して裏で更新」を主にする</h2></div>
+<section class="section" aria-labelledby="2026-11-03-一覧の高速化は前回の一覧をすぐ表示して裏で更新を主にする"><div class="section-head"><span class="section-num">03</span><h2 id="2026-11-03-一覧の高速化は前回の一覧をすぐ表示して裏で更新を主にする">2026-11-03: 一覧の高速化は「前回の一覧をすぐ表示して裏で更新」を主にする</h2></div>
 <div class="decision-statement"><p>一覧画面の読み込みを改善するため、次の 4 つを行う。(1) 最後に取得した一覧を <code>cacheDir/video_list.json</code> に保存し、次回はそれをすぐに表示して裏で最新を取得する(stale-while-revalidate)。(2) 全フォルダと全メディアの一括取得を並列にし、<code>orderBy</code> を外して <code>fields</code> を絞る。(3) JSON のパースなどをメインスレッドの外で行う。(4) サムネイルの取得をカードのスコープに移し、画面外のダウンロードをキャンセルする。</p></div>
 <p>Drive には「フォルダ配下すべて」をサーバーの側で絞る API がない。そのため一覧の取得ではドライブ全体のフォルダと動画・webp(実データで数千件、数ページ)を毎回順に取得しており、そのあいだ画面全体にスピナーが出ていた。API 側の削減(2)だけではページ数そのものは減らないので、体感を大きく変えるのは(1)である。一覧は数百 KB の JSON で済み、対象フォルダが変わったときは使わないので、違う一覧を表示するおそれも小さい。</p>
 <p>トレードオフとして、起動直後は最大で前回の取得時点の一覧が表示される(数秒で差し替わる)。キャッシュの thumbnailLink は失効している可能性がある。影響するのは .webp がない動画だけで、最新の一覧に差し替わったあとに取り直す。thumbnailLink を <code>fields</code> から外すとレスポンスの生成が速くなる可能性はあるが、.webp がない動画のサムネイルの代わりがなくなるため、今回は残す。サムネイルの重複取得をメモリ上で防ぐ仕組み(ViewModel でのジョブの共有)はやめ、一時ファイルに書いてから rename することで、同時に取得しても書きかけのファイルが使われないようにした。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-12-プレイリストの最初の版は連続再生なしでメタデータを非正規化する"><div class="section-head"><span class="section-num">03</span><h2 id="2026-07-12-プレイリストの最初の版は連続再生なしでメタデータを非正規化する">2026-07-12: プレイリストの最初の版は連続再生なしで、メタデータを非正規化する</h2></div>
+<section class="section" aria-labelledby="2026-07-12-プレイリストの最初の版は連続再生なしでメタデータを非正規化する"><div class="section-head"><span class="section-num">04</span><h2 id="2026-07-12-プレイリストの最初の版は連続再生なしでメタデータを非正規化する">2026-07-12: プレイリストの最初の版は連続再生なしで、メタデータを非正規化する</h2></div>
 <div class="decision-statement"><p>プレイリストは「作成、表示、タップで 1 本ずつ再生」を最初の版とし、自動で次の動画へ進む連続再生は入れない。プレイリストの項目は、動画のメタデータ(ファイル名、サイズ、フォルダパス)を Room に非正規化して保存する。</p></div>
 <p>要件は「作成できる」「タブで表示できる」である。連続再生には再生キューと、動画ごとのネットワーク判定や保存の制御が絡むため、別の作業に分ける。非正規化しておけば、Drive に問い合わせずに(オフラインでも)プレイリストを表示できる。プレイリストへの追加は YouTube などの慣習に合わせて、カードの長押しにした。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-12-複数フォルダは全件を-1-回取得してフォルダごとに絞ってからまとめる"><div class="section-head"><span class="section-num">04</span><h2 id="2026-07-12-複数フォルダは全件を-1-回取得してフォルダごとに絞ってからまとめる">2026-07-12: 複数フォルダは、全件を 1 回取得してフォルダごとに絞ってからまとめる</h2></div>
+<section class="section" aria-labelledby="2026-07-12-複数フォルダは全件を-1-回取得してフォルダごとに絞ってからまとめる"><div class="section-head"><span class="section-num">05</span><h2 id="2026-07-12-複数フォルダは全件を-1-回取得してフォルダごとに絞ってからまとめる">2026-07-12: 複数フォルダは、全件を 1 回取得してフォルダごとに絞ってからまとめる</h2></div>
 <div class="decision-statement"><p>対象フォルダが複数でも、Drive からの全フォルダ・全メディアの取得は 1 回だけにし、フォルダごとに配下だけを絞ってからまとめる(fileId で重複を除き、先に指定したフォルダを優先する)。フォルダパスは「対象フォルダ名/相対パス」の形式にそろえる。設定は DataStore に JSON のリストで保存し、以前の単一フォルダの設定は自動で移す。</p></div>
 <p>全件を取得する方式の利点(リクエストの数がフォルダの数に依存しない)をそのまま生かせる。入れ子になったフォルダを両方とも対象にしても、同じ動画は重複して表示されない。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-12-一覧のタイトルは日付に加えて拡張子も除く"><div class="section-head"><span class="section-num">05</span><h2 id="2026-07-12-一覧のタイトルは日付に加えて拡張子も除く">2026-07-12: 一覧のタイトルは日付に加えて拡張子も除く</h2></div>
+<section class="section" aria-labelledby="2026-07-12-一覧のタイトルは日付に加えて拡張子も除く"><div class="section-head"><span class="section-num">06</span><h2 id="2026-07-12-一覧のタイトルは日付に加えて拡張子も除く">2026-07-12: 一覧のタイトルは日付に加えて拡張子も除く</h2></div>
 <div class="decision-statement"><p>フィードバックは「日付部分を除いて表示」だったが、拡張子 <code>.mp4</code> も合わせて除く。</p></div>
 <p>概要欄に完全なファイル名を表示するので、情報は失われない。一覧は YouTube のようにタイトルだけを見せるほうが、要望の意図に合う。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-12-フォルダパスは一覧の取得時に算出して持ち回る"><div class="section-head"><span class="section-num">06</span><h2 id="2026-07-12-フォルダパスは一覧の取得時に算出して持ち回る">2026-07-12: フォルダパスは一覧の取得時に算出して持ち回る</h2></div>
+<section class="section" aria-labelledby="2026-07-12-フォルダパスは一覧の取得時に算出して持ち回る"><div class="section-head"><span class="section-num">07</span><h2 id="2026-07-12-フォルダパスは一覧の取得時に算出して持ち回る">2026-07-12: フォルダパスは一覧の取得時に算出して持ち回る</h2></div>
 <div class="decision-statement"><p>再生画面の概要欄に表示するフォルダパス(選択フォルダからの相対パス)は、一覧の取得時に全フォルダの情報から算出して VideoItem に持たせ、ルート引数と Room(保存済み用)にも保存する。再生時に Drive API へ問い合わせない。</p></div>
 <p>一覧を取得した時点で、全フォルダの親子関係はすでに手元にあり、追加のコストがかからない。再生時に問い合わせると、待ち時間が増え、オフラインでの再生の妨げにもなる。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-ストリーミング再生と-CacheWriter-によるバックグラウンド保存"><div class="section-head"><span class="section-num">07</span><h2 id="2026-07-11-ストリーミング再生と-CacheWriter-によるバックグラウンド保存">2026-07-11: ストリーミング再生と CacheWriter によるバックグラウンド保存</h2></div>
+<section class="section" aria-labelledby="2026-07-11-ストリーミング再生と-CacheWriter-によるバックグラウンド保存"><div class="section-head"><span class="section-num">08</span><h2 id="2026-07-11-ストリーミング再生と-CacheWriter-によるバックグラウンド保存">2026-07-11: ストリーミング再生と CacheWriter によるバックグラウンド保存</h2></div>
 <div class="decision-statement"><p>「ダウンロードが終わってから再生」をやめ、「すぐにストリーミング再生し、再生中に裏で全体を保存」に変える。実装には Media3 の SimpleCache、CacheDataSource、CacheWriter を使い、手書きのダウンロード処理(.part に書いてから rename)を置き換える。</p></div>
 <p>フィードバックで、タップから再生が始まるまでの待ち時間をなくすことが優先だと分かった。CacheDataSource は再生で受信したデータをキャッシュに書き、CacheWriter はまだ取得していない範囲だけを取得する。そのため同じデータを二度ダウンロードせず、通信量への配慮とも両立する。容量の上限の設定を変えても、部分キャッシュに反映されるのはアプリの再起動後になる(LeastRecentlyUsedCacheEvictor は作成時に上限が決まるため)。ただし完全に保存済みのファイルには、これまでどおり CacheEvictionPolicy がすぐに適用されるので、実害は小さい。</p>
 <p>トレードオフとして、ストリーミングを始めたあとにトークンが失効すると(1 時間を超えて続けて再生した場合)、再生エラーになることがある。open のたびにトークンを取り直すことで、多くの場合は避けられる。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-再帰列挙は全フォルダと全メディアを一括で取得しツリーの判定はクライアントで行う"><div class="section-head"><span class="section-num">08</span><h2 id="2026-07-11-再帰列挙は全フォルダと全メディアを一括で取得しツリーの判定はクライアントで行う">2026-07-11: 再帰列挙は全フォルダと全メディアを一括で取得し、ツリーの判定はクライアントで行う</h2></div>
+<section class="section" aria-labelledby="2026-07-11-再帰列挙は全フォルダと全メディアを一括で取得しツリーの判定はクライアントで行う"><div class="section-head"><span class="section-num">09</span><h2 id="2026-07-11-再帰列挙は全フォルダと全メディアを一括で取得しツリーの判定はクライアントで行う">2026-07-11: 再帰列挙は全フォルダと全メディアを一括で取得し、ツリーの判定はクライアントで行う</h2></div>
 <div class="decision-statement"><p>選択フォルダの配下を再帰的に列挙するときは、(1) ドライブ全体のフォルダ一覧(mimeType = folder)と、(2) ドライブ全体の動画とサムネイルの一覧(mimeType = video/mp4 or image/webp)を一括で取得し、クライアントの側で parents を辿って選択フォルダの配下かどうかを判定する(DriveFolderTree)。"root" というエイリアスは files/root で実際の ID に解決してから比べる。</p></div>
 <p>最初は階層ごとに親フォルダを OR でまとめて files.list する BFS で実装した。しかし実データは 1 つの親フォルダの直下に動画のフォルダが 1,216 個ある構造で、1 階層に 160 回以上のリクエストが必要になり、使えなかった(フォルダ数の上限 1000 に達して 0 件になる不具合も起きた)。一括方式なら、フォルダの数や階層に関係なく、ページングを含めて数回のリクエストで済む。Drive には「フォルダ配下すべて」をサーバーの側で絞る API がないため、ツリーの判定はクライアントで行うしかない。</p>
 <p>トレードオフとして、選択フォルダの外にある動画のメタデータも一度取得する(drive.readonly の範囲内で、通信量は数百 KB ほど)。mimeType が video/mp4 でない .mp4(誤って登録されたもの)は列挙されない。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-再生画面から戻ったら再生を止める"><div class="section-head"><span class="section-num">09</span><h2 id="2026-07-11-再生画面から戻ったら再生を止める">2026-07-11: 再生画面から戻ったら再生を止める</h2></div>
+<section class="section" aria-labelledby="2026-07-11-再生画面から戻ったら再生を止める"><div class="section-head"><span class="section-num">10</span><h2 id="2026-07-11-再生画面から戻ったら再生を止める">2026-07-11: 再生画面から戻ったら再生を止める</h2></div>
 <div class="decision-statement"><p>再生画面を「戻る」で離れたら再生を止める。バックグラウンドで再生を続けるのは、ホーム画面へ移ったとき、画面をオフにしたとき、ほかのアプリに切り替えたときである。</p></div>
 <p>一覧に戻ったあとも音声だけが流れ続けると、アプリの中に止める手段が通知しかなく、混乱する。仕様の「アプリを離れても・画面をオフにしても継続」は、ホーム画面への移動と画面オフを指すと解釈した。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-サムネイルの保存先は-cacheDir動画は-filesDir"><div class="section-head"><span class="section-num">10</span><h2 id="2026-07-11-サムネイルの保存先は-cacheDir動画は-filesDir">2026-07-11: サムネイルの保存先は cacheDir、動画は filesDir</h2></div>
+<section class="section" aria-labelledby="2026-07-11-サムネイルの保存先は-cacheDir動画は-filesDir"><div class="section-head"><span class="section-num">11</span><h2 id="2026-07-11-サムネイルの保存先は-cacheDir動画は-filesDir">2026-07-11: サムネイルの保存先は cacheDir、動画は filesDir</h2></div>
 <div class="decision-statement"><p>動画のキャッシュは <code>filesDir/video_cache/</code>(仕様どおり)に、サムネイルは <code>cacheDir/thumbs/</code> に置き、Room では動画だけを管理する。</p></div>
 <p>サムネイルは数十 KB と小さく、取り直すのも安いので、ストレージが足りなくなったときに OS が自動で消してよい cacheDir が向いている。LRU の管理(Room)の対象を動画だけにすると、仕組みを単純に保てる。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-フォルダのブラウズはマイドライブを起点にするだけにする"><div class="section-head"><span class="section-num">11</span><h2 id="2026-07-11-フォルダのブラウズはマイドライブを起点にするだけにする">2026-07-11: フォルダのブラウズはマイドライブを起点にするだけにする</h2></div>
+<section class="section" aria-labelledby="2026-07-11-フォルダのブラウズはマイドライブを起点にするだけにする"><div class="section-head"><span class="section-num">12</span><h2 id="2026-07-11-フォルダのブラウズはマイドライブを起点にするだけにする">2026-07-11: フォルダのブラウズはマイドライブを起点にするだけにする</h2></div>
 <div class="decision-statement"><p>フォルダ選択は、マイドライブ(root)を起点にしたツリーだけに対応する。共有ドライブや「共有アイテム」を起点にしたブラウズには、最初の版では対応しない。</p></div>
 <p>仕様の主な使い方は自分の Drive のフォルダである。共有ドライブへの対応は files.list のパラメーター(driveId など)を足せば、あとから広げられる。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-Credential-Manager-の扱い"><div class="section-head"><span class="section-num">12</span><h2 id="2026-07-11-Credential-Manager-の扱い">2026-07-11: Credential Manager の扱い</h2></div>
+<section class="section" aria-labelledby="2026-07-11-Credential-Manager-の扱い"><div class="section-head"><span class="section-num">13</span><h2 id="2026-07-11-Credential-Manager-の扱い">2026-07-11: Credential Manager の扱い</h2></div>
 <div class="decision-statement"><p>認証の主な経路は AuthorizationClient とし、Credential Manager(GetGoogleIdOption)は <code>local.properties</code> に <code>google.webClientId</code> がある場合だけ使う。</p></div>
 <p>Credential Manager で Google アカウントの ID トークンを得るには、Web アプリケーション用のクライアント ID(serverClientId)が必須である。しかし Google Cloud Console には、Android 用のクライアント ID だけを登録済みと聞いている。一方、AuthorizationClient.authorize() はパッケージ名と SHA-1 で解決されるため追加の設定が要らず、アカウント選択の UI、同意画面、アクセストークンの取得、サイレントな再認証のすべてを満たす。</p>
 <p>このアプリはバックエンドを持たず、ID トークンの使い道がないため、機能要件は AuthorizationClient だけで完全に満たせる。Web 用のクライアント ID が用意できたら、<code>local.properties</code> に設定するだけで Credential Manager を使ったサインインの UI が有効になる。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-Drive-API-のクライアントを自作するOkHttp-で直接呼ぶ"><div class="section-head"><span class="section-num">13</span><h2 id="2026-07-11-Drive-API-のクライアントを自作するOkHttp-で直接呼ぶ">2026-07-11: Drive API のクライアントを自作する(OkHttp で直接呼ぶ)</h2></div>
+<section class="section" aria-labelledby="2026-07-11-Drive-API-のクライアントを自作するOkHttp-で直接呼ぶ"><div class="section-head"><span class="section-num">14</span><h2 id="2026-07-11-Drive-API-のクライアントを自作するOkHttp-で直接呼ぶ">2026-07-11: Drive API のクライアントを自作する(OkHttp で直接呼ぶ)</h2></div>
 <div class="decision-statement"><p>google-api-services-drive(公式の Java クライアント)は使わず、OkHttp と kotlinx-serialization で <code>files.list</code> と <code>files.get?alt=media</code> を直接呼ぶ。</p></div>
 <p>公式のクライアントは Apache HTTP などの重い推移的な依存を持ち、Android と相性が悪い。必要なエンドポイントは 2〜3 個だけで、インターフェース(<code>DriveApiClient</code>)を切ってモックできるようにする方針とも合う。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-DI-は-Hilt-を使わず手書きのコンテナにする"><div class="section-head"><span class="section-num">14</span><h2 id="2026-07-11-DI-は-Hilt-を使わず手書きのコンテナにする">2026-07-11: DI は Hilt を使わず手書きのコンテナにする</h2></div>
+<section class="section" aria-labelledby="2026-07-11-DI-は-Hilt-を使わず手書きのコンテナにする"><div class="section-head"><span class="section-num">15</span><h2 id="2026-07-11-DI-は-Hilt-を使わず手書きのコンテナにする">2026-07-11: DI は Hilt を使わず手書きのコンテナにする</h2></div>
 <div class="decision-statement"><p>Application に <code>AppContainer</code> を手書きで置く。</p></div>
 <p>依存するオブジェクトは 10 個未満で、画面も 5 つである。Hilt の導入にかかる手間(kapt や ksp の設定、覚えること)に見合わない。CLAUDE.md の「過度な抽象化はしない」にも従っている。</p>
 </section>
-<section class="section" aria-labelledby="2026-07-11-Wi-Fi-のみの判定は-NOT_METERED-で行う"><div class="section-head"><span class="section-num">15</span><h2 id="2026-07-11-Wi-Fi-のみの判定は-NOT_METERED-で行う">2026-07-11: 「Wi-Fi のみ」の判定は NOT_METERED で行う</h2></div>
+<section class="section" aria-labelledby="2026-07-11-Wi-Fi-のみの判定は-NOT_METERED-で行う"><div class="section-head"><span class="section-num">16</span><h2 id="2026-07-11-Wi-Fi-のみの判定は-NOT_METERED-で行う">2026-07-11: 「Wi-Fi のみ」の判定は NOT_METERED で行う</h2></div>
 <div class="decision-statement"><p>設定の名前は「モバイル回線でもダウンロード」だが、実際の判定は <code>NET_CAPABILITY_NOT_METERED</code>(従量制でないかどうか)で行う。</p></div>
 <p>ユーザーが守りたいのは通信量である。従量制の Wi-Fi テザリングを Wi-Fi として許可してしまうより、従量制かどうかで判定するほうが意図に合う。</p>
 </section>
