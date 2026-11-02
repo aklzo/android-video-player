@@ -1,18 +1,28 @@
 package com.aklzo.videoplayer.data.source.drive
 
 import com.aklzo.videoplayer.data.source.VideoFolder
+import com.aklzo.videoplayer.data.source.VideoItem
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class DriveVideoSourceTest {
+
+    @get:Rule
+    val tempDir = TemporaryFolder()
 
     /** ドライブ全体をメモリ上で模した DriveApiClient のフェイク */
     private class FakeDriveApiClient(
         private val allFolders: List<DriveFile>,
         private val allMedia: List<DriveFile>,
         private val rootId: String = "rootId",
+        /** downloadFile が書き込む内容。null なら途中まで書いて失敗する */
+        private val downloadContent: String? = null,
     ) : DriveApiClient {
         override suspend fun listFolders(folderIds: List<String>): List<DriveFile> =
             allFolders.filter { it.parents.firstOrNull() in folderIds }
@@ -30,7 +40,14 @@ class DriveVideoSourceTest {
             fileId: String,
             destination: File,
             onProgress: (Long, Long?) -> Unit,
-        ) = throw UnsupportedOperationException()
+        ) {
+            destination.parentFile?.mkdirs()
+            if (downloadContent == null) {
+                destination.writeText("partial") // 本物と違い後始末しない(呼び出し側の責務を確認する)
+                throw IOException("network error")
+            }
+            destination.writeText(downloadContent)
+        }
 
         override suspend fun downloadUrl(url: String, destination: File) =
             throw UnsupportedOperationException()
@@ -134,5 +151,36 @@ class DriveVideoSourceTest {
         val videos = source.listVideos(listOf(VideoFolder("root", "マイドライブ")))
 
         assertEquals(setOf("v.mp4", "w.mp4"), videos.map { it.name }.toSet())
+    }
+
+    private fun videoWithThumb() = VideoItem(
+        id = "v1",
+        name = "20260101_a.mp4",
+        sizeBytes = 10L,
+        thumbnailFileId = "t1",
+        thumbnailUrl = null,
+    )
+
+    @Test
+    fun `サムネイルは動画 ID 名の webp に保存され、一時ファイルは残らない`() = runTest {
+        val thumbsDir = File(tempDir.root, "thumbs")
+        val api = FakeDriveApiClient(emptyList(), emptyList(), downloadContent = "webp-bytes")
+        val source = DriveVideoSource(api, thumbsDir)
+
+        val file = source.getThumbnail(videoWithThumb())
+
+        assertEquals(File(thumbsDir, "v1.webp"), file)
+        assertEquals("webp-bytes", file!!.readText())
+        assertEquals(listOf("v1.webp"), thumbsDir.list()!!.toList())
+    }
+
+    @Test
+    fun `サムネイル取得に失敗したら null を返し、途中のファイルを残さない`() = runTest {
+        val thumbsDir = File(tempDir.root, "thumbs")
+        val api = FakeDriveApiClient(emptyList(), emptyList(), downloadContent = null)
+        val source = DriveVideoSource(api, thumbsDir)
+
+        assertNull(source.getThumbnail(videoWithThumb()))
+        assertEquals(emptyList<String>(), thumbsDir.list()!!.toList())
     }
 }

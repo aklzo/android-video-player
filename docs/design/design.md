@@ -15,6 +15,7 @@ com.aklzo.videoplayer
 │   ├── source/                  … 「動画ソース」抽象化(将来ローカルフォルダ等を追加可能)
 │   │   ├── VideoSource.kt       … インターフェース(一覧/サムネイル/再生用データ取得)
 │   │   ├── VideoItem.kt         … ソース非依存の動画メタデータモデル
+│   │   ├── VideoListCache.kt    … 最後に取得した一覧のディスクキャッシュ(即表示用)
 │   │   └── drive/
 │   │       ├── DriveApiClient.kt    … Drive REST API 呼び出し(インターフェース + OkHttp 実装)
 │   │       └── DriveVideoSource.kt  … VideoSource の Drive 実装
@@ -54,8 +55,8 @@ DI は Hilt を使わず、Application に手書きの `AppContainer` を置く(
 
 ```kotlin
 interface VideoSource {
-    /** フォルダ配下(サブフォルダ再帰)の動画一覧を取得 */
-    suspend fun listVideos(folderId: String): List<VideoItem>
+    /** 対象フォルダ群の配下(サブフォルダ再帰)の動画一覧を取得 */
+    suspend fun listVideos(folders: List<VideoFolder>): List<VideoItem>
     /** サムネイル画像を取得してローカルファイルに保存し、その File を返す */
     suspend fun getThumbnail(item: VideoItem): File?
     /** 再生・キャッシュ保存に使う URI を返す(Drive は files.get?alt=media の URL) */
@@ -70,11 +71,37 @@ interface VideoSource {
 
 ### 再帰列挙
 
-- 選択フォルダから BFS でサブフォルダを辿り、全 `.mp4` / `.webp` を収集する。
-- Drive API の呼び出し回数を抑えるため、`files.list` の `q` に
-  `'id1' in parents or 'id2' in parents ...` と親フォルダをまとめて指定する(1 クエリ最大 15 件)。
-- 暴走防止のため深さ上限 10・フォルダ数上限 1000。循環(ショートカット等)は訪問済み集合で防ぐ。
+- ドライブ全体のフォルダ一覧(`mimeType = folder`)と動画/サムネイル一覧
+  (`mimeType = video/mp4 or image/webp`)を `files.list` で一括取得し、
+  クライアント側で parents を辿って選択フォルダ配下に絞る(`DriveFolderTree`)。
+  BFS 方式は 1 階層 1,216 フォルダの実データで破綻したため廃止(→ decisions.md)。
+- 2 種類の一括取得(と "root" の実 ID 解決)は**並列**に投げる。
+  並び順はクライアント側(`VideoListGrouper`)で決めるため `orderBy` は付けず、
+  `fields` も用途ごとに最小限にする(フォルダ一覧は id/name/mimeType/parents のみ)。
+- JSON パース・ツリー判定・グルーピングはメインスレッド外(IO / Default)で行う。
+- 循環・過深は辿るホップ数の上限(100)で打ち切る。
 - `.webp` の紐付けは「同じ親フォルダ内の同名ファイル」に限定する(別ディレクトリの同名を誤マッチさせない)。
+
+### 一覧のディスクキャッシュ(stale-while-revalidate)
+
+- 最後に取得した一覧(`List<VideoItem>`)を対象フォルダ ID 集合とともに
+  `cacheDir/video_list.json` に保存する(`VideoListCache`)。
+- 一覧画面の初回表示では、対象フォルダが一致するキャッシュがあれば**即表示**し、
+  裏で Drive から最新を取得して差し替える(取得中は上部に細いプログレスバー)。
+- 裏の取得に失敗した場合はキャッシュ表示を維持し、「前回の一覧を表示中」のバナーを出す。
+  キャッシュがない場合は従来どおり全面スピナー/エラー表示。
+- `thumbnailUrl`(Drive の thumbnailLink)は数時間で失効するため、キャッシュ由来の値で
+  取得に失敗することがある。最新一覧に差し替わると(VideoItem が変わるため)再取得される。
+
+### サムネイル取得
+
+- 取得はカードのコンポジション(`produceState`)のスコープで行い、
+  画面外にスクロールして破棄されたカードの取得はキャンセルする
+  (高速スクロール時に画面外のダウンロードが表示中のものを待たせない)。
+- `cacheDir/thumbs/<fileId>.webp` への書き込みは一時ファイル → rename で行い、
+  途中のファイルを他の読み手が掴まないようにする。
+- OkHttp の同一ホスト同時リクエスト上限を 16 に上げる(既定 5)。
+  サムネイルと一覧取得が同じ www.googleapis.com に集中するため。
 
 ## 画面遷移
 

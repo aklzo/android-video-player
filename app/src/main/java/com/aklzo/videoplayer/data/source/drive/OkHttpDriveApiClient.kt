@@ -1,5 +1,7 @@
 package com.aklzo.videoplayer.data.source.drive
 
+import android.os.SystemClock
+import android.util.Log
 import com.aklzo.videoplayer.auth.TokenProvider
 import java.io.File
 import java.io.IOException
@@ -56,14 +58,24 @@ class OkHttpDriveApiClient(
         folderIds.chunked(PARENTS_PER_QUERY).flatMap { chunk ->
             val parentsCondition =
                 chunk.joinToString(" or ") { "'${escapeQuery(it)}' in parents" }
-            listAll("($parentsCondition) and $mimeCondition and trashed = false")
+            listAll(
+                "($parentsCondition) and $mimeCondition and trashed = false",
+                fields = FILE_FIELDS,
+                orderBy = "name", // フォルダ選択画面は API の並び順をそのまま表示する
+            )
         }
 
+    // 一括取得の 2 つは並び順をクライアント側(VideoListGrouper)で決めるため orderBy を付けず、
+    // fields も用途に必要な分だけにしてサーバー側の処理とレスポンスを減らす
+
     override suspend fun listAllFolders(): List<DriveFile> =
-        listAll("mimeType = '${DriveFile.MIME_FOLDER}' and trashed = false")
+        listAll("mimeType = '${DriveFile.MIME_FOLDER}' and trashed = false", fields = FOLDER_FIELDS)
 
     override suspend fun listAllMediaFiles(): List<DriveFile> =
-        listAll("(mimeType = 'video/mp4' or mimeType = 'image/webp') and trashed = false")
+        listAll(
+            "(mimeType = 'video/mp4' or mimeType = 'image/webp') and trashed = false",
+            fields = FILE_FIELDS,
+        )
 
     @Serializable
     private data class FileIdResponse(val id: String)
@@ -80,27 +92,42 @@ class OkHttpDriveApiClient(
         return json.decodeFromString<FileIdResponse>(body).id
     }
 
-    private suspend fun listAll(query: String): List<DriveFile> {
+    private suspend fun listAll(
+        query: String,
+        fields: String,
+        orderBy: String? = null,
+    ): List<DriveFile> {
+        val startedAt = SystemClock.elapsedRealtime()
         val results = mutableListOf<DriveFile>()
+        var pages = 0
         var pageToken: String? = null
         do {
             val url = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
                 .addQueryParameter("q", query)
-                .addQueryParameter("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,parents)")
+                .addQueryParameter("fields", "nextPageToken,files($fields)")
                 .addQueryParameter("pageSize", "1000")
-                .addQueryParameter("orderBy", "name")
+                .apply { orderBy?.let { addQueryParameter("orderBy", it) } }
                 .apply { pageToken?.let { addQueryParameter("pageToken", it) } }
                 .build()
-            val body = withAuthRetry { token ->
+            val page = withAuthRetry { token ->
                 executeCall(buildRequest(url.toString(), token)).use { response ->
                     checkResponse(response)
-                    withContext(Dispatchers.IO) { response.body!!.string() }
+                    // 1 ページ数百 KB になるため、読み込みとパースはメインスレッド外で行う
+                    withContext(Dispatchers.IO) {
+                        json.decodeFromString<FileListResponse>(response.body!!.string())
+                    }
                 }
             }
-            val page = json.decodeFromString<FileListResponse>(body)
             results += page.files.map { it.toModel() }
+            pages++
             pageToken = page.nextPageToken
         } while (pageToken != null)
+        // 一覧が遅いときの切り分け用(adb logcat -s DriveApi)
+        Log.d(
+            TAG,
+            "files.list ${results.size} 件 / $pages ページ / " +
+                "${SystemClock.elapsedRealtime() - startedAt}ms: $query",
+        )
         return results
     }
 
@@ -195,6 +222,11 @@ class OkHttpDriveApiClient(
         value.replace("\\", "\\\\").replace("'", "\\'")
 
     companion object {
+        private const val TAG = "DriveApi"
         private const val PARENTS_PER_QUERY = 15
+
+        /** フォルダのツリー判定に必要な最小限(DriveFileDto の必須項目+parents) */
+        private const val FOLDER_FIELDS = "id,name,mimeType,parents"
+        private const val FILE_FIELDS = "id,name,mimeType,size,thumbnailLink,parents"
     }
 }
