@@ -1440,8 +1440,8 @@ h1, h2, h3, .lede { word-break: auto-phrase; }
 <p>このアプリはサーバーを持たず、端末から Drive API を直接呼びます(<code>app/src/main/java/com/aklzo/videoplayer/data/source/drive/OkHttpDriveApiClient.kt</code>)。リポジトリには Dockerfile や Cloud Build の設定、<code>run.app</code> の URL がなく、git の履歴にも出てきません(2026-11-03 に確認)。Cloud Run のサービスが見つかった場合は、このアプリとは別のものです。</p>
 <p>アプリが使う Google Cloud の設定は次の表のとおりです。消すとアプリが動かなくなるものがあるので、整理の前に役割を確かめてください。</p>
 <div class="table-scroll"><table><caption>表 1　アプリが使う Google Cloud の設定(README.md のセットアップ手順から)</caption><thead><tr><th>リソース</th><th>アプリでの用途</th><th>消したときの影響</th></tr></thead><tbody><tr><td>Drive API の有効化</td><td>動画一覧の取得と再生</td><td>一覧の取得も再生もできなくなる</td></tr><tr><td>OAuth 同意画面(テストモード)</td><td>サインイン時の同意画面とテストユーザーの登録</td><td>サインインできなくなる</td></tr><tr><td>Android 用 OAuth クライアント ID</td><td>パッケージ名 <code>com.aklzo.videoplayer</code> と署名の SHA-1 でアプリを識別する</td><td>サインインできなくなる</td></tr><tr><td>Web 用 OAuth クライアント ID(任意)</td><td>Credential Manager のアカウント選択。<code>local.properties</code> でコメントアウトしており、今は使っていない</td><td>今は影響しない</td></tr></tbody></table></div>
-<div class="evidence"><p>表はリポジトリのコードと README.md から読み取った内容です。実際のプロジェクト ID や、ほかに作ったリソースがあるかどうかは、gcloud で確かめるまで分かりません。</p></div>
-<p>2026-11-03 の時点で、この PC には gcloud CLI が入っていません。WSL(Ubuntu 24.04)の PATH、apt のパッケージ、ホームディレクトリと、Windows 側の <code>where gcloud</code>、Program Files、AppData を調べて見つかりませんでした。apt に取得元が登録されているクラウドの CLI は azure-cli だけです。</p>
+<div class="evidence"><p>表はリポジトリのコードと README.md から読み取った内容です。2026-11-03 に gcloud で確かめたところ、アプリ用のプロジェクトは <code>android-video-player-502112</code> で、表のほかにリソースはありませんでした。Cloud Run は別のアプリのプロジェクトにあり、このアプリとは関係しません。</p></div>
+<p>この PC の WSL(Ubuntu 24.04)には、2026-11-03 の時点で gcloud CLI 591.0.0 が apt で入っています(<code>/usr/bin/gcloud</code>)。</p>
 </section>
 <section class="section" aria-labelledby="gcloud-CLI-のインストール"><div class="section-head"><span class="section-num">02</span><h2 id="gcloud-CLI-のインストール">gcloud CLI のインストール</h2></div>
 <p>Ubuntu では apt で入れる方法をおすすめします。<code>sudo</code> が必要ですが、PATH を設定する必要がなく、以降の更新も <code>apt</code> でできます。<code>sudo</code> を使えない場合は、次の節「sudo を使わないインストール」の手順で入れてください。</p>
@@ -1491,7 +1491,7 @@ tar -xf google-cloud-cli-linux-x86_64.tar.gz</pre>
 </li></ol>
 </section>
 <section class="section" aria-labelledby="リソースの確認"><div class="section-head"><span class="section-num">05</span><h2 id="リソースの確認">リソースの確認</h2></div>
-<div class="evidence"><p>この節と次の節のコマンドは gcloud のリファレンスに沿って書いたもので、この PC にはまだ gcloud がないため実行して確かめていません。エラーになったときは <code>gcloud &lt;コマンド&gt; --help</code> で引数を確かめてください。</p></div>
+<div class="evidence"><p>この節のコマンドは、2026-11-03 に実行して確かめました。次の節の削除と変更のコマンドは gcloud のリファレンスに沿って書いたもので、実行していません。エラーになったときは <code>gcloud &lt;コマンド&gt; --help</code> で引数を確かめてください。</p></div>
 <p>以下の <code>PROJECT_ID</code> は次の手順 1 で確かめたプロジェクト ID に置き換えて実行します。</p>
 <ol class="procedure-steps"><li>
 <h3 id="プロジェクトの一覧を見る">プロジェクトの一覧を見る</h3>
@@ -1533,7 +1533,7 @@ gcloud artifacts repositories delete REPOSITORY --location LOCATION --project PR
 <div class="evidence"><p>推定: Drive API と OAuth は課金なしで使えるため、紐付けを外してもアプリには影響しないと考えています。外したあとで、アプリのサインインと一覧の表示を確かめてください。</p></div>
 </li><li>
 <h3 id="プロジェクトを削除する">プロジェクトを削除する</h3>
-<p>アプリをもう使わない場合だけ行います。削除したプロジェクトは 30 日後に完全に消えます。それまでは <code>gcloud projects undelete PROJECT_ID</code> で戻せます。</p>
+<p>アプリをもう使わない場合だけ行います。控えておく設定と作り直しの手順は「<a href="google-cloud-project-lifecycle.html">Google Cloud プロジェクトの削除と再作成</a>」にあります。削除したプロジェクトは 30 日後に完全に消えます。それまでは <code>gcloud projects undelete PROJECT_ID</code> で戻せます。</p>
 <pre><span class="lang">bash</span>gcloud projects delete PROJECT_ID</pre>
 </li></ol>
 </section>

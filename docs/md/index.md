@@ -15,6 +15,7 @@ summary: 仕様、設計、技術判断の記録、手順書、解説の一覧�
 | [技術判断の記録](design/decisions.md) | 実装中に迷った点の判断と理由 | 判断をしたとき(新しいものを上に足す) |
 | [実装の解説](knowledge/overview.md) | 実装全体を人向けに説明した文書 | 主要な機能の実装を終えたとき |
 | [Google Cloud のリソースの確認と整理](how-to/google-cloud-resources.md) | gcloud CLI の導入と、Google Cloud のリソースの確認と整理の手順 | Google Cloud の構成を変えたとき |
+| [Google Cloud プロジェクトの削除と再作成](how-to/google-cloud-project-lifecycle.md) | アプリ用のプロジェクトを削除する手順と、同じ構成に作り直す手順 | Google Cloud の構成を変えたとき |
 | [Gradle がない環境での Wrapper の生成](troubleshooting/gradle-wrapper-bootstrap.md) | Gradle を入れずに Gradle Wrapper を作る手順 | 同じ問題で手順が変わったとき |
 | [ルート引数の空白が「+」になる問題](troubleshooting/navigation-url-encoding.md) | Navigation Compose のルート引数のエンコードの直し方 | 同じ問題で手順が変わったとき |
 : docs/md/ の文書(HTML では、リンクは対応するページを開く)

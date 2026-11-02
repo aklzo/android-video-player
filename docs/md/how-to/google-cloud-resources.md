@@ -22,9 +22,9 @@ summary: このアプリが Google Cloud で使うのは Drive API と OAuth の
 : アプリが使う Google Cloud の設定(README.md のセットアップ手順から)
 
 > [!NOTE]
-> 表はリポジトリのコードと README.md から読み取った内容です。実際のプロジェクト ID や、ほかに作ったリソースがあるかどうかは、gcloud で確かめるまで分かりません。
+> 表はリポジトリのコードと README.md から読み取った内容です。2026-11-03 に gcloud で確かめたところ、アプリ用のプロジェクトは `android-video-player-502112` で、表のほかにリソースはありませんでした。Cloud Run は別のアプリのプロジェクトにあり、このアプリとは関係しません。
 
-2026-11-03 の時点で、この PC には gcloud CLI が入っていません。WSL(Ubuntu 24.04)の PATH、apt のパッケージ、ホームディレクトリと、Windows 側の `where gcloud`、Program Files、AppData を調べて見つかりませんでした。apt に取得元が登録されているクラウドの CLI は azure-cli だけです。
+この PC の WSL(Ubuntu 24.04)には、2026-11-03 の時点で gcloud CLI 591.0.0 が apt で入っています(`/usr/bin/gcloud`)。
 
 ## gcloud CLI のインストール
 
@@ -110,7 +110,7 @@ gcloud config list
 ## リソースの確認
 
 > [!NOTE]
-> この節と次の節のコマンドは gcloud のリファレンスに沿って書いたもので、この PC にはまだ gcloud がないため実行して確かめていません。エラーになったときは `gcloud <コマンド> --help` で引数を確かめてください。
+> この節のコマンドは、2026-11-03 に実行して確かめました。次の節の削除と変更のコマンドは gcloud のリファレンスに沿って書いたもので、実行していません。エラーになったときは `gcloud <コマンド> --help` で引数を確かめてください。
 
 以下の `PROJECT_ID` は次の手順 1 で確かめたプロジェクト ID に置き換えて実行します。
 
@@ -192,7 +192,7 @@ gcloud billing projects unlink PROJECT_ID
 
 ### 4. プロジェクトを削除する
 
-アプリをもう使わない場合だけ行います。削除したプロジェクトは 30 日後に完全に消えます。それまでは `gcloud projects undelete PROJECT_ID` で戻せます。
+アプリをもう使わない場合だけ行います。控えておく設定と作り直しの手順は「[Google Cloud プロジェクトの削除と再作成](google-cloud-project-lifecycle.md)」にあります。削除したプロジェクトは 30 日後に完全に消えます。それまでは `gcloud projects undelete PROJECT_ID` で戻せます。
 
 ```bash
 gcloud projects delete PROJECT_ID
