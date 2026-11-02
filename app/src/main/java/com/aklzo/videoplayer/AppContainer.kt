@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -40,6 +41,9 @@ class AppContainer(context: Context) {
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
+        // サムネイルと一覧取得が同じ www.googleapis.com に集中するため、
+        // 既定の同一ホスト同時 5 件では一覧のページ取得がサムネイルの後ろで待たされる
+        .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .build()
 
     val driveApiClient: DriveApiClient = OkHttpDriveApiClient(authManager, okHttpClient)

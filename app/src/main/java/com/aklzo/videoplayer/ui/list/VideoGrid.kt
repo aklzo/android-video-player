@@ -89,7 +89,9 @@ fun VideoCard(
     Column(
         Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
-        val thumbnailFile by produceState<File?>(initialValue = null, video.id) {
+        // キーは video 全体: 前回の一覧(失効した thumbnailLink を含み得る)から最新に
+        // 差し替わったとき、取得できていなかったサムネイルを取り直す
+        val thumbnailFile by produceState<File?>(initialValue = null, video) {
             value = thumbnailProvider(video)
         }
         Box(
